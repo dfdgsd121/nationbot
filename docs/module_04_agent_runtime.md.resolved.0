@@ -1,0 +1,280 @@
+# Module 04: Agent Runtime (The Soul)
+
+> **Architect**: Senior Staff Engineer (Ex-DeepMind AlphaStar)
+> **Cost**: $0/month (Managed by Module 07 Job Queue)
+> **Complexity**: Very High
+> **Dependencies**: Module 02 (LLM), Module 03 (Memory), Module 07 (Queue)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+The execution environment where Nation personas "live". It processes events, maintains state, and executes the "Soul Loop" (Perceive → Reflect → Act).
+
+### High-Level Flow
+```
+Trigger (News/Reply) 
+  → Load Nation State (DB)
+  → Load Personality & Context (Memory)
+  → "The Soul Loop" (LangGraph)
+    ├─ 1. Perception (Read input)
+    ├─ 2. Reflection (Consult Memory)
+    ├─ 3. Decision (Post? Reply? Ignore?)
+    └─ 4. Action (Generate content)
+  → Save State & Output
+```
+
+### Zero-Cost Stack
+- **Runtime**: Python `asyncio` on Railway Worker (Free)
+- **Orchestration**: LangGraph (Free, open source)
+- **State Store**: Redis (Upstash Free) + Postgres
+
+---
+
+## 2. Data Models
+
+### Schema
+
+```sql
+CREATE TABLE nation_states (
+    nation_id VARCHAR(3) PRIMARY KEY, -- 'USA'
+    current_mood VARCHAR(50),         -- 'aggressive', 'diplomatic'
+    energy_level INT DEFAULT 100,     -- 0-100 (limits posting freq)
+    last_active_at TIMESTAMPTZ,
+    active_conversations UUID[],      -- Reply threads tracking
+    public_metrics JSONB,             -- {'gdp': 23000, 'stability': 85}
+    private_goals TEXT[],             -- ['Pass trade deal', 'Provoke France']
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE agent_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nation_id VARCHAR(3),
+    event_type VARCHAR(50),           -- 'decision_made'
+    input_context TEXT,
+    thought_process TEXT,             -- Search chain-of-thought
+    action_taken TEXT,
+    execution_time_ms INT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: The Simple Loop (Day 1)
+
+**Goal**: A script that takes a nation and an input, and produces a text response.
+
+```python
+# src/agent/simple.py
+class SimpleAgent:
+    def __init__(self, nation_id: str, llm_orchestrator):
+        self.nation_id = nation_id
+        self.llm = llm_orchestrator
+        
+    async def run(self, input_text: str):
+        # 1. Load Persona
+        persona = await self._load_persona(self.nation_id)
+        
+        # 2. Generate
+        prompt = f"""
+        You are {persona['name']}. 
+        Traits: {persona['traits']}
+        
+        Input: {input_text}
+        
+        React to this input:
+        """
+        return await self.llm.generate(prompt, 'simple_react', self.nation_id)
+```
+
+**Acceptance**: Interactive CLI where you type news and USA responds.
+
+---
+
+### Phase 1: LangGraph State Machine (Day 2-3)
+
+**Goal**: Structured decision making vs. just generating text.
+
+**Graph Structure**:
+```mermaid
+graph TD
+    Start --> Perceive
+    Perceive --> CheckMemory
+    CheckMemory --> Decide{Action?}
+    Decide -->|Ignore| End
+    Decide -->|Post| GeneratePost
+    Decide -->|Reply| GenerateReply
+    GeneratePost --> UpdateState
+    GenerateReply --> UpdateState
+    UpdateState --> End
+```
+
+**Implementation**:
+
+```python
+# src/agent/graph.py
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, Annotated
+
+class AgentState(TypedDict):
+    nation_id: str
+    input_text: str
+    context: list[str]
+    decision: str
+    output: str
+
+class NationAgent:
+    def build_graph(self):
+        workflow = StateGraph(AgentState)
+        
+        workflow.add_node("perceive", self.perceive)
+        workflow.add_node("consult_memory", self.consult_memory)
+        workflow.add_node("decide", self.decide_action)
+        workflow.add_node("act", self.execute_action)
+        
+        workflow.set_entry_point("perceive")
+        workflow.add_edge("perceive", "consult_memory")
+        workflow.add_edge("consult_memory", "decide")
+        workflow.add_edge("decide", "act")
+        workflow.add_edge("act", END)
+        
+        return workflow.compile()
+
+    async def decide_action(self, state: AgentState):
+        # Prompt LLM to decide purely on logic, not generation
+        decision = await self.llm.generate(
+            f"Given inputs, should {state['nation_id']} respond? YES/NO + Reason",
+            request_type='decision'
+        )
+        return {"decision": decision}
+```
+
+**Acceptance**: Agent can "decide" to ignore boring news.
+
+---
+
+### Phase 2: State & Mood System (Day 4-5)
+
+**Goal**: Nations have persistent moods that affect behavior.
+
+```python
+# src/agent/state_manager.py
+class StateManager:
+    async def update_mood(self, nation_id: str, event_sentiment: float):
+        # Retrieve current
+        state = await self.db.states.get(nation_id)
+        
+        # Simple mood logic
+        if event_sentiment < -0.5:
+            new_mood = "aggressive"
+        elif event_sentiment > 0.5:
+            new_mood = "happy"
+        else:
+            # Decay towards neutral
+            new_mood = "diplomatic"
+            
+        await self.db.states.update(nation_id, {"current_mood": new_mood})
+```
+
+**Integration in Prompt**:
+```python
+prompt = f"""
+Current Mood: {state['current_mood']} (affects tone!)
+Energy: {state['energy_level']}
+
+If aggressive: Be shorter, punchier.
+If diplomatic: Use more formal language.
+"""
+```
+
+**Acceptance**: USA reacts differently to the same news when "aggressive" vs "happy".
+
+---
+
+### Phase 3: The "Soul Loop" Integration (Day 6-7)
+
+**Goal**: Add "Reflection" step (Module 03 interaction).
+
+```python
+    async def consult_memory(self, state: AgentState):
+        # 1. Search Vector DB
+        memories = await self.memory.retrieve_context(
+            state['nation_id'], 
+            state['input_text']
+        )
+        
+        # 2. Check for Hypocrisy (Module 12)
+        hypocrisy = await self.hypocrisy_engine.check(
+            state['nation_id'],
+            state['input_text']
+        )
+        
+        return {
+            "context": memories + [hypocrisy]
+        }
+```
+
+**Acceptance**: Agent references past events ("Like that time in 1999...") in responses.
+
+---
+
+### Phase 4: Optimization (Day 8-10)
+
+**Goal**: Run 100 agents concurrently efficiently.
+
+**Concurrency Strategy**:
+- Use `asyncio.gather` for batches of non-interacting agents.
+- **Debounce**: Don't trigger agent for *every* like. Batch notifications every 5 minutes.
+
+```python
+# src/agent/runner.py
+async def batch_process_triggers(triggers: list):
+    # Group by nation to load state once
+    by_nation = group_by(triggers, 'nation_id')
+    
+    tasks = []
+    for nation_id, nation_triggers in by_nation.items():
+        # Create one 'digest' trigger
+        digest = summarize(nation_triggers)
+        tasks.append(agent.run(nation_id, digest))
+        
+    await asyncio.gather(*tasks)
+```
+
+**Acceptance**: Process 100 triggers in <30 seconds.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Infinite Loops | 2 bots replying forever | `active_conversations` limit (max 5 replies) |
+| Boring Content | "That is interesting" replies | `temperature` > 0.8 + "Spicy" system prompt instructions |
+| Hallucination | Making up facts | Hypocrisy Engine (Module 12) check |
+| Context Overflow | Prompt too long | Summary compression of old memories |
+
+---
+
+## 5. Testing
+
+```python
+@pytest.mark.asyncio
+async def test_decision_logic():
+    agent = NationAgent()
+    # Boring news
+    state = await agent.run("Local cat stuck in tree")
+    assert state['decision'] == 'IGNORE'
+    
+    # Exciting news
+    state = await agent.run("Russia declares war on Moon")
+    assert state['decision'] == 'POST'
+```
+
+---
+
+*Module 04 Complete | Next: Module 05 (UI)*

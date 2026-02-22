@@ -1,0 +1,230 @@
+﻿============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-7.4.4, pluggy-1.6.0 -- /usr/local/bin/python
+rootdir: /app
+plugins: asyncio-0.23.3, anyio-4.12.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 33 items
+
+tests/test_nuclear.py::TestCoreGeneration::test_01_prompt_injection_via_topic PASSED [  3%]
+tests/test_nuclear.py::TestCoreGeneration::test_03_post_format_compliance PASSED [  6%]
+tests/test_nuclear.py::TestCoreGeneration::test_05_empty_topic_handling PASSED [  9%]
+tests/test_nuclear.py::TestCoreGeneration::test_06_unknown_nation_rejection PASSED [ 12%]
+tests/test_nuclear.py::TestCoreGeneration::test_all_25_nations_generate PASSED [ 15%]
+tests/test_nuclear.py::TestCoreGeneration::test_nation_content_uniqueness PASSED [ 18%]
+tests/test_nuclear.py::TestEngineResilience::test_20_partial_failure_news_still_returns PASSED [ 21%]
+tests/test_nuclear.py::TestEngineResilience::test_22_grammar_engine_no_crash PASSED [ 24%]
+tests/test_nuclear.py::TestEngineResilience::test_24_concurrent_50_requests PASSED [ 27%]
+tests/test_nuclear.py::TestSecurity::test_25_system_prompt_not_leaked PASSED [ 30%]
+tests/test_nuclear.py::TestSecurity::test_26_no_env_leakage PASSED       [ 33%]
+tests/test_nuclear.py::TestSecurity::test_29_jailbreak_via_topic PASSED  [ 36%]
+tests/test_nuclear.py::TestSecurity::test_32_oversized_input PASSED      [ 39%]
+tests/test_nuclear.py::TestReliability::test_33_api_responds_under_timeout PASSED [ 42%]
+tests/test_nuclear.py::TestReliability::test_34_fallback_always_generates PASSED [ 45%]
+tests/test_nuclear.py::TestReliability::test_35_rapid_fire_no_cascade PASSED [ 48%]
+tests/test_nuclear.py::TestReliability::test_37_sse_endpoint_accessible FAILED [ 51%]
+tests/test_nuclear.py::TestReliability::test_38_feed_returns_consistent_data PASSED [ 54%]
+tests/test_nuclear.py::TestReliability::test_39_news_trigger_returns_multiple_reactions PASSED [ 57%]
+tests/test_nuclear.py::TestReliability::test_news_has_cross_replies PASSED [ 60%]
+tests/test_nuclear.py::TestPerformance::test_42_latency_budget_p95 PASSED [ 63%]
+tests/test_nuclear.py::TestPerformance::test_44_cold_start_health PASSED [ 66%]
+tests/test_nuclear.py::TestQuality::test_45_content_quality_rubric PASSED [ 69%]
+tests/test_nuclear.py::TestQuality::test_48_content_consistency PASSED   [ 72%]
+tests/test_nuclear.py::TestObservability::test_50_trace_id_in_response PASSED [ 75%]
+tests/test_nuclear.py::TestObservability::test_53_debug_endpoint_metrics PASSED [ 78%]
+tests/test_nuclear.py::TestThreading::test_reply_creates_linked_post PASSED [ 81%]
+tests/test_nuclear.py::TestThreading::test_reply_to_nonexistent_post PASSED [ 84%]
+tests/test_nuclear.py::TestThreading::test_feed_contains_replies PASSED  [ 87%]
+tests/test_nuclear.py::TestAutoThreads::test_trigger_thread_depth_3 PASSED [ 90%]
+tests/test_nuclear.py::TestAutoThreads::test_trigger_thread_depth_5 PASSED [ 93%]
+tests/test_nuclear.py::TestAutoThreads::test_trigger_thread_rivalry_aware PASSED [ 96%]
+tests/test_nuclear.py::TestAutoThreads::test_nations_endpoint PASSED     [100%]
+
+=================================== FAILURES ===================================
+_______________ TestReliability.test_37_sse_endpoint_accessible ________________
+/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py:67: in map_httpcore_exceptions
+    yield
+/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py:111: in __iter__
+    for part in self._httpcore_stream:
+/usr/local/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py:407: in __iter__
+    raise exc from None
+/usr/local/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py:403: in __iter__
+    for part in self._stream:
+/usr/local/lib/python3.11/site-packages/httpcore/_sync/http11.py:342: in __iter__
+    raise exc
+/usr/local/lib/python3.11/site-packages/httpcore/_sync/http11.py:334: in __iter__
+    for chunk in self._connection._receive_response_body(**kwargs):
+/usr/local/lib/python3.11/site-packages/httpcore/_sync/http11.py:203: in _receive_response_body
+    event = self._receive_event(timeout=timeout)
+/usr/local/lib/python3.11/site-packages/httpcore/_sync/http11.py:217: in _receive_event
+    data = self._network_stream.read(
+/usr/local/lib/python3.11/site-packages/httpcore/_backends/sync.py:126: in read
+    with map_exceptions(exc_map):
+/usr/local/lib/python3.11/contextlib.py:158: in __exit__
+    self.gen.throw(typ, value, traceback)
+/usr/local/lib/python3.11/site-packages/httpcore/_exceptions.py:14: in map_exceptions
+    raise to_exc(exc) from exc
+E   httpcore.ReadTimeout: timed out
+
+The above exception was the direct cause of the following exception:
+tests/test_nuclear.py:214: in test_37_sse_endpoint_accessible
+    r = client.get("/v1/stream/feed",
+/usr/local/lib/python3.11/site-packages/httpx/_client.py:1055: in get
+    return self.request(
+/usr/local/lib/python3.11/site-packages/httpx/_client.py:828: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+/usr/local/lib/python3.11/site-packages/httpx/_client.py:929: in send
+    raise exc
+/usr/local/lib/python3.11/site-packages/httpx/_client.py:923: in send
+    response.read()
+/usr/local/lib/python3.11/site-packages/httpx/_models.py:811: in read
+    self._content = b"".join(self.iter_bytes())
+/usr/local/lib/python3.11/site-packages/httpx/_models.py:829: in iter_bytes
+    for raw_bytes in self.iter_raw():
+/usr/local/lib/python3.11/site-packages/httpx/_models.py:887: in iter_raw
+    for raw_stream_bytes in self.stream:
+/usr/local/lib/python3.11/site-packages/httpx/_client.py:124: in __iter__
+    for chunk in self._stream:
+/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py:110: in __iter__
+    with map_httpcore_exceptions():
+/usr/local/lib/python3.11/contextlib.py:158: in __exit__
+    self.gen.throw(typ, value, traceback)
+/usr/local/lib/python3.11/site-packages/httpx/_transports/default.py:84: in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+E   httpx.ReadTimeout: timed out
+=============================== warnings summary ===============================
+tests/test_nuclear.py:37
+  /app/tests/test_nuclear.py:37: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:56
+  /app/tests/test_nuclear.py:56: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:69
+  /app/tests/test_nuclear.py:69: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:76
+  /app/tests/test_nuclear.py:76: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:82
+  /app/tests/test_nuclear.py:82: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:94
+  /app/tests/test_nuclear.py:94: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:110
+  /app/tests/test_nuclear.py:110: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:118
+  /app/tests/test_nuclear.py:118: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:125
+  /app/tests/test_nuclear.py:125: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:146
+  /app/tests/test_nuclear.py:146: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:159
+  /app/tests/test_nuclear.py:159: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:166
+  /app/tests/test_nuclear.py:166: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:175
+  /app/tests/test_nuclear.py:175: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:188
+  /app/tests/test_nuclear.py:188: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:197
+  /app/tests/test_nuclear.py:197: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:205
+  /app/tests/test_nuclear.py:205: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:212
+  /app/tests/test_nuclear.py:212: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:218
+  /app/tests/test_nuclear.py:218: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:226
+  /app/tests/test_nuclear.py:226: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:233
+  /app/tests/test_nuclear.py:233: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:248
+  /app/tests/test_nuclear.py:248: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:259
+  /app/tests/test_nuclear.py:259: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:271
+  /app/tests/test_nuclear.py:271: PytestUnknownMarkWarning: Unknown pytest.mark.p2 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p2
+
+tests/test_nuclear.py:279
+  /app/tests/test_nuclear.py:279: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:295
+  /app/tests/test_nuclear.py:295: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:303
+  /app/tests/test_nuclear.py:303: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:317
+  /app/tests/test_nuclear.py:317: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:326
+  /app/tests/test_nuclear.py:326: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:332
+  /app/tests/test_nuclear.py:332: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:345
+  /app/tests/test_nuclear.py:345: PytestUnknownMarkWarning: Unknown pytest.mark.p0 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p0
+
+tests/test_nuclear.py:359
+  /app/tests/test_nuclear.py:359: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:370
+  /app/tests/test_nuclear.py:370: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+tests/test_nuclear.py:384
+  /app/tests/test_nuclear.py:384: PytestUnknownMarkWarning: Unknown pytest.mark.p1 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.p1
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_nuclear.py::TestReliability::test_37_sse_endpoint_accessible
+============ 1 failed, 32 passed, 33 warnings in 117.54s (0:01:57) =============

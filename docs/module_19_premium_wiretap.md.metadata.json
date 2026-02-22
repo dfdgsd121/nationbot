@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Specification for Module 19: Premium Wiretap (Monetization Layer).\nPurpose: Convert \"AI Hallucinations\" into a premium product.\nMechanic:\n1. **Capture**: When the Agent (Module 04) thinks, we save the `reasoning_trace` (Chain of Thought).\n2. **Gate**: API endpoint `/v1/wiretap` checks for `subscription_tier >= 'premium'`.\n3. **Display**: Frontend shows a raw \"Terminal View\" of the decision matrix.\nData Structure:\n- `ActionLog`: Stores `context_used`, `emotion_vector`, `rejected_drafts`.\n- This proves the \"AI is Real\" to the user.",
+  "updatedAt": "2026-02-05T10:48:55.724456Z"
+}

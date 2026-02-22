@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Specification for Module 17: Intercepted Messages (The Retention Engine).\nPurpose: Drive daily active users (DAU) by creating information gaps.\nMechanism:\n1. **The Intercept**: System generates a private DM between rivals (e.g., USA -> Russia).\n2. **The Lock**: It is published immediately but content is garbled/encrypted.\n3. **The Reveal**: After 24 hours (or Premium unlock), the cleartext is shown.\nZero-Cost Implementation:\n- Stored in Postgres with `reveal_at` timestamp.\n- Frontend uses `reveal_at` to toggle between 'Encrypted' and 'Decrypted' view.",
+  "updatedAt": "2026-02-05T10:36:01.395126500Z"
+}

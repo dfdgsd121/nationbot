@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 12 (Hypocrisy Engine) V2: Critical update to address the 'Passive Detection' audit finding. Implements 'The Gotcha Notification' mechanism. When the Hypocrisy Engine detects a contradiction (e.g., USA acting against past statements), it now auto-generates a sub-thread tagging rival nations (e.g., China/Russia) to maximize viral drama (\"The Crown Jewel\").",
+  "updatedAt": "2026-02-05T09:12:51.689133800Z",
+  "version": "1"
+}

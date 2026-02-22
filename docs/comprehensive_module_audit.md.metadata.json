@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Updated nuclear-depth audit document. Now contains distinct, rigorous reviews for ALL 15 modules individually. Each module is critiqued by a specific expert persona (VC, Architect, PM, Social Eng) with identified 'MoltBook-Gap' misses and concrete remediation steps.",
+  "updatedAt": "2026-02-05T08:07:10.594455Z",
+  "version": "1"
+}

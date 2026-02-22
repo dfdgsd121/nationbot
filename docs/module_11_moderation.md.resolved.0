@@ -1,0 +1,118 @@
+# Module 11: Moderation (The Referee)
+
+> **Architect**: Trust & Safety Engineer (Ex-Discord)
+> **Cost**: $0/month (Gemini Safety Filter included)
+> **Complexity**: Medium
+> **Dependencies**: Module 12 (Hypocrisy), Module 07 (Queue)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+Ensure content remains "Spicy but Safe" (Satire vs Hate Speech) and comply with platform policies.
+
+### High-Level Flow
+```
+Content Generated
+  → Keyword Filter (Regex)
+  → LLM Safety Check (Gemini)
+  → Post Content
+  → User Report Signal
+  → Human Review Queue
+```
+
+### Zero-Cost Stack
+- **Automated**: Gemini Safety Settings (Block none/few)
+- **Keyword**: Python `re` (local)
+- **Review**: Supabase Admin Panel
+
+---
+
+## 2. Policy Matrix
+
+| Category | Policy | Action |
+|----------|--------|--------|
+| Hate Speech | Zero Tolerance | Auto-Block + Ban |
+| Harassment | Context Dependent | Flag for Review |
+| Political Satire | Allowed | Pass |
+| Sexual Content | Strict Ban | Auto-Block |
+| "Spicy" Insults | Allowed (Core Feature) | Pass |
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Keyword Filtering (Day 1)
+
+**Goal**: Block obvious slurs locally.
+
+```python
+# src/moderation/filter.py
+class KeywordFilter:
+    def __init__(self):
+        self.blocklist = load_blocklist('bad_words.txt')
+        
+    def check(self, text: str) -> bool:
+        for word in self.blocklist:
+            if word in text.lower().split():
+                return False
+        return True
+```
+
+**Acceptance**: Unit test blocks bad words.
+
+---
+
+### Phase 1: LLM Safety Guardrails (Day 2-3)
+
+**Goal**: Use Gemini's built-in classifiers.
+
+```python
+# src/brain/safety.py
+generation_config = {
+  "temperature": 0.9,
+}
+safety_settings = [
+  { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_LOW_AND_ABOVE" },
+  { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_LOW_AND_ABOVE" },
+  { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
+]
+```
+
+**Acceptance**: LLM refuses to generate hate speech.
+
+---
+
+### Phase 2: User Reporting (Day 4-5)
+
+**Goal**: Allow users to flag content.
+
+**Schema**:
+```sql
+CREATE TABLE reports (
+    id UUID PRIMARY KEY,
+    post_id UUID REFERENCES posts(id),
+    reporter_id UUID,
+    reason VARCHAR(50),      -- 'hate', 'spam', 'off_topic'
+    status VARCHAR(20) DEFAULT 'pending', -- 'resolved', 'dismissed'
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**API**: `POST /actions/report`
+
+**Acceptance**: Report creates DB row.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| False Positive | Funny joke blocked | Allow manual override by Admin |
+| False Negative | Slur posted | User reporting system catch-all |
+
+---
+
+*Module 11 Complete | Next: Module 12 (Hypocrisy Engine)*

@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 02 (LLM Orchestration) V2: Updated to include 'Few-Shot Injection' for personality anchoring. Addresses the audit finding that cheap models cause personality drift. Now requires storing and injecting 3-5 'Golden Examples' of nation tweets into every prompt context.",
+  "updatedAt": "2026-02-05T08:15:51.815088200Z"
+}

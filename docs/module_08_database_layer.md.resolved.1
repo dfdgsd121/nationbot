@@ -1,0 +1,109 @@
+# Module 08: Database Layer (The Memory Bank)
+
+> **Architect**: Senior Database Engineer (Ex-CockroachDB)
+> **Cost**: $0/month (Supabase Free Tier)
+> **Complexity**: High (Schema design & Optimization)
+> **Dependencies**: Module 03 (Pgvector), Module 09 (RLS)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+The persistent storage for all structured data: Users, Nations, Posts, and Vectors.
+**CRITICAL UPDATE**: Implements **Repository Pattern** to abstract database access and fix "Vendor Lock-in" risk. Business logic depends on repositories, not SQL/Supabase directly.
+
+### High-Level Stack
+- **Database**: PostgreSQL 15+ (Supabase)
+- **Extensions**: [vector](file:///C:/Users/Rentorzo/.gemini/antigravity/brain/70f436c8-59a2-4f71-a5a3-c01bce9050fa/src/memory/memory_store.py#92-96), `pg_cron`
+- **Abstraction**: SQLAlchemy (Python) / Prisma (JS) for Repository Layer
+
+### Zero-Cost Constraints
+- Storage: 500MB
+- Connections: ~60 pooling (Supabase Transaction Pooler port 6543)
+
+---
+
+## 2. Global Schema Design (Highlights)
+
+```sql
+-- Core Post Table
+CREATE TABLE posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nation_id VARCHAR(3) REFERENCES nations(id),
+    content TEXT NOT NULL,
+    type VARCHAR(20) DEFAULT 'reaction',
+    
+    -- AI & Architecture columns
+    embedding vector(768), 
+    trigger_news_id UUID REFERENCES feed_items(id),
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Indexes for performance
+    INDEX idx_posts_nation (nation_id, created_at DESC)
+);
+```
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Setup (Day 1)
+(Standard Supabase Init)
+
+### Phase 1: The Repository Abstraction (The Fix) (Day 2-3)
+
+**Goal**: Decouple App Logic from DB Vendor.
+
+**Interface**:
+```python
+# src/database/repository.py
+from abc import ABC, abstractmethod
+
+class PostRepository(ABC):
+    @abstractmethod
+    async def create(self, post: Post) -> Post: pass
+    
+    @abstractmethod
+    async def get_feed(self, limit: int, cursor: str) -> List[Post]: pass
+
+# Supabase Implementation
+class SupabasePostRepo(PostRepository):
+    def __init__(self, client):
+        self.client = client
+        
+    async def create(self, post):
+        # Uses Supabase client specific logic
+        return await self.client.table('posts').insert(post).execute()
+```
+
+**Usage in Service**:
+```python
+# Service depends on Interface, not Supabase
+async def create_reaction(repo: PostRepository, content: str):
+    await repo.create({...})
+```
+
+### Phase 2: RLS & Security (Day 4-5)
+
+**Goal**: Row Level Security policies.
+
+```sql
+-- Policy: Users view own claims
+CREATE POLICY "Users view own claims" 
+ON claims FOR SELECT 
+USING (auth.uid() = user_id);
+```
+
+---
+
+## 4. Failure Modes & Mitigations
+- **Lock-in**: High rewrite cost?
+  - *Fix*: Repository pattern ensures 90% of code is vendor-agnostic.
+- **Connection Limit**: Apps crash.
+  - *Fix*: Use Transaction Pooler (Port 6543).
+
+---
+
+*Module 08 (V2) Complete | Status: NUCLEAR READY*

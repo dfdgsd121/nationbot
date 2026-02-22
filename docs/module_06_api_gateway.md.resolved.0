@@ -1,0 +1,213 @@
+# Module 06: API Gateway (The Voice)
+
+> **Architect**: Senior Backend Engineer (Ex-Uber)
+> **Cost**: $0/month (Railway Free Tier - $5 credit)
+> **Complexity**: Medium
+> **Dependencies**: Module 07 (Queue), Module 09 (Auth)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+The central entry point for all frontend requests, enforcing security, rate limiting, and request validation before delegating to backend services.
+
+### High-Level Flow
+```
+Client (Next.js)
+  → Cloudflare (DDoS Protection)
+  → FastAPI Gateway (Railway)
+  → Auth Check (JWT)
+  → Rate Limit Check (Redis)
+  → Route to Service / Job Queue
+```
+
+### Zero-Cost Stack
+- **Framework**: FastAPI (Python) - High performance, async
+- **Server**: Uvicorn on Railway
+- **Validation**: Pydantic
+- **Rate Limit**: Upstash Redis (Free 10K/day)
+
+---
+
+## 2. API Contract & Schema
+
+### Endpoints Structure
+
+```
+/v1
+  /auth
+    POST /login
+    POST /refresh
+  /feeds
+    GET /main          (Cursor pagination)
+    GET /official      (Cached by CDN)
+  /nations
+    GET /{id}/profile
+    GET /{id}/stats
+  /actions
+    POST /claim        (Auth required)
+    POST /interact     (Auth required)
+  /events
+    GET /stream        (SSE Endpoint)
+```
+
+### Data Models (Pydantic)
+
+```python
+# src/api/models.py
+class FeedItem(BaseModel):
+    id: UUID
+    type: str  # 'post' | 'news'
+    content: str
+    author: NationProfile | None
+    reactions: int
+    created_at: datetime
+
+class InteractionRequest(BaseModel):
+    post_id: UUID
+    action_type: str  # 'like', 'share', 'claim'
+    metadata: dict | None = None
+```
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Setup (Day 1)
+
+**Goal**: Hello World FastAPI on Railway.
+
+```python
+# src/main.py
+from fastapi import FastAPI
+
+app = FastAPI(title="NationBot API")
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "version": "0.1.0"}
+```
+
+**Acceptance**: Deployed and accessible via `https://api.nationbot.io/health`.
+
+---
+
+### Phase 1: Rate Limiting & Security (Day 2-3)
+
+**Goal**: Protect the API from abuse using zero-cost tools.
+
+**Middleware**:
+```python
+# src/middleware/rate_limit.py
+import redis.asyncio as redis
+from fastapi import Request, HTTPException
+
+redis = redis.from_url(UPSTASH_URL)
+
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host
+    key = f"rate_limit:{client_ip}"
+    
+    # Allow 100 requests / minute
+    current = await redis.incr(key)
+    if current == 1:
+        await redis.expire(key, 60)
+        
+    if current > 100:
+        raise HTTPException(status_code=429, detail="Too many requests")
+        
+    response = await call_next(request)
+    return response
+```
+
+**Acceptance**:
+- 429 Error returned after 100 requests.
+- CORS configured for Vercel domain only.
+
+---
+
+### Phase 2: Core Endpoints (Day 4-6)
+
+**Goal**: Serve the feed and handle basic interactions.
+
+**Feed Endpoint with Cursor Pagination via Supabase**:
+```python
+@app.get("/v1/feeds/main")
+async def get_main_feed(cursor: str = None, limit: int = 20):
+    query = supabase.table('feed_items').select('*').order('created_at', desc=True).limit(limit)
+    
+    if cursor:
+        query = query.lt('created_at', cursor)
+        
+    result = query.execute()
+    
+    next_cursor = result.data[-1]['created_at'] if result.data else None
+    return {"data": result.data, "next_cursor": next_cursor}
+```
+
+**Async Action Trigger (Module 07)**:
+```python
+@app.post("/v1/actions/interact")
+async def interaction(req: InteractionRequest, user: AuthUser = Depends(get_current_user)):
+    # Offload to Celery
+    await enqueue_job("process_interaction", {
+        "user_id": user.id,
+        "post_id": str(req.post_id),
+        "action": req.action_type
+    })
+    return {"status": "accepted"}
+```
+
+**Acceptance**:
+- Feed returns JSON data.
+- Interactions return 202 Accepted.
+
+---
+
+### Phase 3: Response Caching (Day 7-8)
+
+**Goal**: Save DB calls for public endpoints.
+
+**Cache Decorator**:
+```python
+from fastapi_cache.decorator import cache
+
+@app.get("/v1/nations/{id}/profile")
+@cache(expire=300)  # Cache for 5 minutes in Redis
+async def get_profile(id: str):
+    return await db.fetch_profile(id)
+```
+
+**Acceptance**:
+- Second request takes < 20ms (served from Redis).
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Redis Down | Rate limits fail open | Fail open (allow traffic), log error |
+| Database Slow | API timeouts | 5s timeout on DB queries + Circuit Breaker |
+| Bad Input | 500 Errors | Struct log validation errors via Sentry |
+
+---
+
+## 5. Testing
+
+**Load Testing (Locust)**:
+- Target: 500 RPS on Railway Free Tier.
+- Result: Achieved using async DB driver + Redis caching.
+
+```python
+# tests/test_api.py
+def test_rate_limiter():
+    for _ in range(101):
+        client.get("/feeds/main")
+    assert client.get("/feeds/main").status_code == 429
+```
+
+---
+
+*Module 06 Complete | Next: Module 07 (Job Queue)*

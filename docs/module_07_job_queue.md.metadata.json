@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 07 (Job Queue) V2: Critical update to address 'Priority Inversion' and 'Queue Rot'. Defines strictly separated RabbitMQ/Redis queues: `high_priority` for user actions (claims/replies) and `default` for background news processing. Also enables Dead Letter Queues (DLQ) for failed tasks to prevent infinite retry loops.",
+  "updatedAt": "2026-02-05T08:59:41.022200300Z",
+  "version": "1"
+}

@@ -1,0 +1,176 @@
+# Module 12: Hypocrisy Engine (The Truth)
+
+> **Architect**: Principal AI Researcher (Ex-DeepMind)
+> **Cost**: $0/month (Supabase pgvector + Gemini)
+> **Complexity**: High (The "Secret Sauce")
+> **Dependencies**: Module 03 (Memory), Module 02 (LLM)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+The killer feature. Automatically detects when a nation's statement contradicts its history or actions, generating a "satirical context note."
+
+### High-Level Flow
+```
+Agent Statement ("We love peace")
+  → Search Historical Facts (Vector DB)
+  → "We invaded X in 2003", "We sell weapons to Y"
+  → Compare Statement vs Facts (LLM)
+  → Detected? → Inject Context Note
+```
+
+### Zero-Cost Stack
+- **Knowledge Base**: Wikipedia Extracts (Vectorized in Supabase)
+- **Logic**: Gemini 1.5 Flash (Free tier)
+
+---
+
+## 2. Data Models
+
+### Schema
+
+```sql
+CREATE TABLE historical_facts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nation_id VARCHAR(3),
+    fact_content TEXT,                -- "USA invaded Iraq in 2003"
+    category VARCHAR(50),             -- 'military', 'economy'
+    embedding vector(768),
+    source_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    INDEX idx_facts_nation (nation_id)
+);
+
+CREATE TABLE hypocrisy_checks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    statement TEXT,
+    related_post_id UUID,
+    verdict VARCHAR(20),              -- 'hypocritical', 'consistent'
+    confidence FLOAT,
+    context_note TEXT,
+    used_facts UUID[],
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Knowledge Base (Day 1)
+
+**Goal**: Ingest 1000 key historical facts about major powers.
+
+```python
+# src/hypocrisy/ingest.py
+facts = [
+    ("USA", "Invaded Iraq in 2003 citing WMDs which were never found."),
+    ("China", "Maintains strict internet censorship via the Great Firewall."),
+    ("Russia", "Annexed Crimea in 2014 violates international law."),
+    ("France", "Still controls currency of 14 African nations (CFA Franc).")
+]
+
+async def seed_facts():
+    for nation, fact in facts:
+        embedding = await embedder.embed(fact)
+        await supabase.table('historical_facts').insert({
+            'nation_id': nation,
+            'fact_content': fact,
+            'embedding': embedding
+        })
+```
+
+**Acceptance**: Vector database populated.
+
+---
+
+### Phase 1: Detection Logic (Day 2-3)
+
+**Goal**: LLM judges contradiction.
+
+```python
+# src/hypocrisy/engine.py
+class HypocrisyEngine:
+    async def check(self, nation_id: str, statement: str) -> str | None:
+        # 1. Retrieve Facts
+        facts = await vector_store.search(nation_id, statement, limit=3)
+        fact_text = "\n".join([f"- {f['fact_content']}" for f in facts])
+        
+        # 2. Prompt LLM
+        prompt = f"""
+        Nation: {nation_id}
+        Statement: "{statement}"
+        
+        Historical Context:
+        {fact_text}
+        
+        Task: Does the statement contradict the history?
+        If YES (>80% confidence), write a witty 1-sentence context note.
+        If NO, return "PASS".
+        
+        Format: [VERDICT] Context Note
+        """
+        
+        response = await llm.generate(prompt)
+        
+        if response.startswith("[YES]"):
+            return response.replace("[YES]", "").strip()
+        return None
+```
+
+**Acceptance**: 
+- Input: "USA: We respect sovereignty." 
+- Output: "Context: You have intervened in 81 foreign elections since 1946."
+
+---
+
+### Phase 2: Integration (Day 4-5)
+
+**Goal**: Attach notes to posts automatically.
+
+```python
+# src/agent/middleware.py
+async def post_processing(post):
+    note = await hypocrisy_engine.check(post.nation_id, post.content)
+    if note:
+        post.context_note = note
+        post.is_hypocritical = True
+    return post
+```
+
+**Acceptance**: UI shows "Context Note" under hypocritical posts.
+
+---
+
+### Phase 3: Community Feedback (Day 6-7)
+
+**Goal**: "Community Notes" style voting. Use user votes to improve accuracy.
+
+**Schema**:
+```sql
+CREATE TABLE context_votes (
+    check_id UUID,
+    user_id UUID,
+    vote_type VARCHAR(10), -- 'helpful', 'not_helpful'
+    UNIQUE(check_id, user_id)
+);
+```
+
+**Acceptance**: Notes with negative score hidden.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Hallucination | False accusation | Links to Wikipedia required in note |
+| Bias | AI hates one country | Ensure fact DB is balanced (top 50 facts per nation) |
+| Cost | Too many checks | Only check posts > 10 likes |
+
+---
+
+*Module 12 Complete | Next: Module 13 (Meme Propagation)*

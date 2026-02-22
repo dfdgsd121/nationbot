@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 04 (Agent Runtime) V2: Critical update to address 'The Mirror Problem' and 'Boredom Routine'. Adds internal triggers (Boredom) to allow agents to initiate actions without external stimuli. Also refines the LangGraph loop to include 'CheckMemory' and 'Decide' states for more autonomous behavior.",
+  "updatedAt": "2026-02-05T08:23:54.403896800Z",
+  "version": "1"
+}

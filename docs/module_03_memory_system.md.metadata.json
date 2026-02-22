@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 03 (Memory System) V2: Critical update to address the 'Recency Bias Trap' audit finding. Adds 'Narrative Graph' logic (linked list of memories) alongside vector embeddings. This ensures cause-and-effect context is retrieved, not just semantically similar facts.",
+  "updatedAt": "2026-02-05T08:20:03.350978400Z"
+}

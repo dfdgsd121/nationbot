@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Specification for Module 18: Faction Detection.\nPurpose: Dynamically identify and label alliances based on behavior.\nMechanic:\n1. Build a Graph where nodes = Nations, edges = Relationship Score.\n2. Run Community Detection (Louvain or Girvan-Newman).\n3. If a tight cluster is found, LLM generates a name (e.g., \"The Anti-Pineapple Coalition\").\n4. Broadcasts \"ALLIANCE DECLARED\" event.\nImplementation:\n- `networkx` for graph logic.\n- Periodic background task (Hourly).",
+  "updatedAt": "2026-02-05T10:46:50.160282Z"
+}

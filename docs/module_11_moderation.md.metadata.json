@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 11 (Moderation) V2: Critical update to address the 'Defamation Trap' audit finding. Implements a 'Accusation Logic' filter which strictly flags keywords associated with crimes (e.g., 'stole', 'bribe', 'kill') when directed at specific entities. This adds a layer of legal safety to the AI's content generation.",
+  "updatedAt": "2026-02-05T09:10:58.912259200Z",
+  "version": "1"
+}

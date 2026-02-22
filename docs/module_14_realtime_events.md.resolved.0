@@ -1,0 +1,120 @@
+# Module 14: Real-time Events (The Pulse)
+
+> **Architect**: Senior Real-time Engineer (Ex-whatsapp)
+> **Cost**: $0/month (SSE over HTTP)
+> **Complexity**: Medium
+> **Dependencies**: Module 06 (API), Module 07 (Queue)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+Deliver new posts, notifications, and stats updates to clients instantly.
+
+### Why SSE over WebSockets?
+- **Vercel**: Serverless functions have execution limits. WebSockets require long-running servers.
+- **SSE**: Unidirectional (Server -> Client) is perfect for feeds. Works over standard HTTP/2.
+- **Railway**: Can host a dedicated robust SSE broadcaster if Vercel times out.
+
+### High-Level Flow
+```
+Event (New Post)
+  → Publish to Redis Channel ("channel:usa")
+  → SSE Endpoint (FastAPI) listening to Redis
+  → Stream to Client Connection
+```
+
+### Zero-Cost Stack
+- **Broker**: Upstash Redis Pub/Sub
+- **Protocol**: Server-Sent Events (EventSource)
+- **Client**: `eventsource-parser` in React
+
+---
+
+## 2. Implementation Phases
+
+### Phase 0: Publisher (Day 1)
+
+**Goal**: Publish event to Redis.
+
+```python
+# src/realtime/publisher.py
+async def broadcast(event_type: str, payload: dict):
+    message = json.dumps({"type": event_type, "data": payload})
+    await redis.publish("global_events", message)
+```
+
+**Acceptance**: `redis-cli monitor` shows publish command.
+
+---
+
+### Phase 1: The SSE Interface (Day 2-3)
+
+**Goal**: FastAPI streaming response.
+
+```python
+# src/api/stream.py
+from sse_starlette.sse import EventSourceResponse
+
+@app.get("/v1/events/stream")
+async def messages_stream(req: Request):
+    async def event_generator():
+        pubsub = redis.pubsub()
+        await pubsub.subscribe("global_events")
+        try:
+            while True:
+                if await req.is_disconnected():
+                    break
+                message = await pubsub.get_message(ignore_subscribe_messages=True)
+                if message:
+                    yield {
+                        "event": "update",
+                        "data": message['data']
+                    }
+                await asyncio.sleep(0.1)
+        finally:
+            await pubsub.close()
+
+    return EventSourceResponse(event_generator())
+```
+
+**Acceptance**: `curl -N localhost/stream` receives updates.
+
+---
+
+### Phase 2: Client Connection (Day 4-5)
+
+**Goal**: Auto-reconnecting frontend client.
+
+```tsx
+// src/lib/realtime.ts
+const connect = () => {
+    const sse = new EventSource('/api/v1/events/stream');
+    
+    sse.addEventListener('update', (e) => {
+        const payload = JSON.parse(e.data);
+        useStore.getState().addPost(payload);
+    });
+    
+    sse.onerror = () => {
+        sse.close();
+        setTimeout(connect, 5000); // Retry
+    };
+}
+```
+
+**Acceptance**: Feed updates without refresh.
+
+---
+
+## 3. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Connection Limit | Drop connections | Max 1000 concurrent (Railway limit). Scale horizontally. |
+| Message Loss | Update missed | Client fetches "catch-up" API on reconnect. |
+
+---
+
+*Module 14 Complete | Next: Module 15 (Share Cards)*

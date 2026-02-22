@@ -1,0 +1,134 @@
+# Module 09: Auth System (The Gatekeeper)
+
+> **Architect**: Senior Security Engineer (Ex-Auth0)
+> **Cost**: $0/month (Supabase Auth - 50K MAU free)
+> **Complexity**: Medium
+> **Dependencies**: Module 05 (UI), Module 06 (API)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+Manage user identity, sessions, and permissions securely across frontend and backend.
+
+### High-Level Flow
+```
+User 
+  → Login (Google/GitHub) via Supabase Auth
+  → JWT Token Issued (Access + Refresh)
+  → Frontend stores cookie
+  → Request API (with Bearer Token)
+  → Gateway validates JWT content
+```
+
+### Zero-Cost Stack
+- **Provider**: Supabase Auth (GoTrue)
+- **Methods**: Email/Password + OAuth (Google, GitHub)
+- **Session**: JWT (Stateless)
+
+---
+
+## 2. Implementation Phases
+
+### Phase 0: Setup (Day 1)
+
+**Goal**: Enable Auth providers in Supabase dashboard.
+
+**Config**:
+- Enable "Email" provider.
+- Enable "Google" provider (Client ID/Secret from GCP Console).
+- Redirect URL: `https://nationbot.vercel.app/auth/callback`
+
+**Acceptance**: Login page redirects to Google and back.
+
+---
+
+### Phase 1: Frontend Integration (Day 2-3)
+
+**Goal**: Protected routes in Next.js.
+
+**Middleware**:
+```ts
+// src/middleware.ts
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
+
+export async function middleware(req) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+  
+  const { data: { session } } = await supabase.auth.getSession()
+
+  // Protect /claims routes
+  if (req.nextUrl.pathname.startsWith('/claims') && !session) {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  return res
+}
+```
+
+**Acceptance**: Accessing `/claims` redirects to `/login` if logged out.
+
+---
+
+### Phase 2: Backend Validation (Day 4-5)
+
+**Goal**: Verify JWTs in FastAPI.
+
+**Dependency**:
+```python
+# src/api/auth.py
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+import jwt
+
+security = HTTPBearer()
+
+async def get_current_user(token: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(token.credentials, SUPABASE_JWT_SECRET, algorithms=["HS256"])
+        return User(id=payload['sub'], email=payload['email'])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+```
+
+**Acceptance**: API returns 401 with invalid token.
+
+---
+
+### Phase 3: RBAC (Day 6-7)
+
+**Goal**: Admin vs User roles.
+
+**Schema**:
+```sql
+CREATE TABLE capabilities (
+  user_id UUID REFERENCES auth.users(id),
+  role VARCHAR(20) DEFAULT 'user', -- 'admin', 'moderator'
+  can_post BOOLEAN DEFAULT TRUE
+);
+```
+
+**Check**:
+```python
+def require_admin(user: User = Depends(get_current_user)):
+    if user.role != 'admin':
+        raise HTTPException(status_code=403)
+```
+
+**Acceptance**: Only admins can hit `/admin/*` endpoints.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Token Leak | Account takeover | Short expiry (1h) + Revocation list |
+| Auth Down | No login | Fallback to "Guest Mode" (Read only) |
+
+---
+
+*Module 09 Complete | Next: Module 10 (Analytics)*

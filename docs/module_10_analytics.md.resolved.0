@@ -1,0 +1,131 @@
+# Module 10: Analytics (The Nervous System)
+
+> **Architect**: Lead Data Scientist (Ex-Spotify)
+> **Cost**: $0/month (Mixpanel Free Tier < 20M events)
+> **Complexity**: Medium
+> **Dependencies**: Module 05 (UI), Module 06 (API)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+Track user behavior, measure product-market fit, and run experiments (A/B testing) without costing a fortune.
+
+### High-Level Flow
+```
+User Action (Click/Scroll)
+  → Frontend SDK (Mixpanel)
+  → Backend Event (PostHog)
+  → Dashboard Visualization
+  → Insight Generation
+```
+
+### Zero-Cost Stack
+- **Product Analytics**: Mixpanel (Free: 20M events/mo)
+- **Feature Flags/Experiments**: PostHog (Free: 1M events/mo)
+- **Privacy**: Anonymized IPs, no PII stored in analytics
+
+---
+
+## 2. Event Taxonomy
+
+### Core Events
+
+| Event Name | Properties | Purpose |
+|------------|------------|---------|
+| `post_viewed` | `nation_id`, `category` | Measure engagement depth |
+| `reaction_click` | `type` (fire/dead), `post_id` | User sentiment |
+| `claim_attempt` | `nation_id`, `source` | Conversion funnel top |
+| `claim_success` | `nation_id` | Conversion conversion |
+| `share_card_generated` | `post_id`, `platform` | Viral loop tracking |
+| `official_news_click` | `source_id` | "Split Reality" validation |
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Setup (Day 1)
+
+**Goal**: Mixpanel integrated in Next.js.
+
+```tsx
+// src/lib/analytics.ts
+import mixpanel from 'mixpanel-browser';
+
+mixpanel.init(process.env.NEXT_PUBLIC_MIXPANEL_TOKEN, {
+  debug: process.env.NODE_ENV === 'development',
+  track_pageview: true,
+  persistence: 'localStorage',
+});
+
+export const track = (name: string, props: object = {}) => {
+  mixpanel.track(name, props);
+};
+```
+
+**Acceptance**: Events appearing in Mixpanel Live View.
+
+---
+
+### Phase 1: Backend Tracking (Day 2-3)
+
+**Goal**: Track critical server-side events (e.g., LLM errors, API usage).
+
+```python
+# src/api/analytics.py
+from posthog import Posthog
+
+posthog = Posthog(project_api_key='...', host='https://app.posthog.com')
+
+def track_server_event(user_id: str, event: str, props: dict):
+    posthog.capture(user_id, event, props)
+```
+
+**Acceptance**: Server logs correlate with user actions.
+
+---
+
+### Phase 2: A/B Testing (Day 4-5)
+
+**Goal**: Test "Spicy" vs "Diplomatic" feed sorting.
+
+**PostHog Feature Flag**:
+- Key: `feed_algorithm`
+- Split: 50% Control (Chronological), 50% Test (Viral-weighted).
+
+```python
+# src/api/feed.py
+if posthog.get_feature_flag('feed_algorithm', user_id) == 'viral':
+    query = query.order('reaction_count', desc=True)
+else:
+    query = query.order('created_at', desc=True)
+```
+
+**Acceptance**: Two distinct user experiences live in production.
+
+---
+
+### Phase 3: Dashboarding (Day 6-7)
+
+**Goal**: Real-time KPI visualization.
+
+**Mixpanel Reports**:
+1. **Retention Cohorts**: daily usage by signup week.
+2. **Viral Coefficient**: Shares / Active Users.
+3. **Funnel**: Signup → Claim → First Post → Share.
+
+**Acceptance**: Dashboard link shareable with team.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Ad Blockers | Missing client data (30%) | Use server-side tracking proxy |
+| Event Volume Spike | Overage charges | Sampling (track 10% of views) |
+
+---
+
+*Module 10 Complete | Next: Module 11 (Moderation)*

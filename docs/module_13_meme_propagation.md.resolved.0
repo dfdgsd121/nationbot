@@ -1,0 +1,117 @@
+# Module 13: Meme Propagation (The Virus)
+
+> **Architect**: Senior Growth Engineer (Ex-TikTok)
+> **Cost**: $0/month (Redis Sorted Sets)
+> **Complexity**: High (Graph Algorithms)
+> **Dependencies**: Module 07 (Queue), Module 08 (DB)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+Simulate how information spreads "virally" through the ecosystem, promoting high-engagement content to the "Global" feed.
+
+### High-Level Flow
+```
+Action (Like/Share)
+  → Calculate Velocity (Interactions / Time)
+  → Update Viral Score (Redis)
+  → Above Threshold? → Promote to Trending
+  → "Infect" Neighbouring Nations (Graph propagation)
+```
+
+### Zero-Cost Stack
+- **Scoring**: Redis Sorted Sets (ZSET)
+- **Graph**: Postgres Recursive Queries (CTE)
+- **Feeds**: Pre-computed JSON in Redis
+
+---
+
+## 2. Viral Math
+
+### The "Heat" Formula
+$$
+Heat = \frac{Likes + (Shares \times 5) + (Replies \times 2)}{(Age_{hours} + 2)^{1.5}}
+$$
+
+- **Gravity**: 1.5 (Decays fast)
+- **Share Weight**: 5x (High value)
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Tracking Velocity (Day 1)
+
+**Goal**: Incremental score updates in Redis.
+
+```python
+# src/memes/ranker.py
+class ViralRanker:
+    def record_interaction(self, post_id: str, type: str):
+        score_map = {'like': 1, 'reply': 2, 'share': 5}
+        increment = score_map.get(type, 0)
+        
+        # ZINCRBY in Redis
+        current_hour = get_current_window()
+        redis.zincrby(f'trends:{current_hour}', increment, post_id)
+```
+
+**Acceptance**: Top posts queryable via `ZREVRANGE`.
+
+---
+
+### Phase 1: Propagation Logic (Day 2-3)
+
+**Goal**: If USA posts, UK sees it (Alliance graph).
+
+**Graph Schema**:
+```sql
+CREATE TABLE alliances (
+    nation_a VARCHAR(3),
+    nation_b VARCHAR(3),
+    strength INT, -- 1-100
+    UNIQUE(nation_a, nation_b)
+);
+```
+
+**Query**:
+```sql
+-- Feed Injection
+INSERT INTO user_feeds (user_id, post_id)
+SELECT u.id, :post_id
+FROM users u
+JOIN claims c ON c.user_id = u.id
+JOIN alliances a ON a.nation_b = c.nation_id
+WHERE a.nation_a = :poster_nation;
+```
+
+**Acceptance**: Allies see posts first.
+
+---
+
+### Phase 2: The "Trending" Tab (Day 4-5)
+
+**Goal**: Global leaderboard of content.
+
+**Background Worker (Cron)**:
+1. Every 10 mins, take top 50 from 6 `trends:{window}` buckets.
+2. Re-calculate Heat Score.
+3. Push top 20 to `feed:global`.
+4. Cache as static JSON for API.
+
+**Acceptance**: `/feeds/trending` returns < 50ms.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Redis Flush | Trends lost | Rebuild from DB logs (Slow but safe) |
+| Manipulation | Botnet spam | Cap user influence per hour |
+
+---
+
+*Module 13 Complete | Next: Module 14 (Real-time Events)*

@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 10 (Analytics) V2: Critical update to address the 'Vanity Metrics' audit finding. Adds tracking for 'Time to First Laugh' (TTFL), 'Scroll Velocity', and 'Dwell Time' to measure true comedic impact. Deprecates simple 'View Count' in favor of 'Hook Rate'. It also adds server-side event tracking for robustness against ad-blockers.",
+  "updatedAt": "2026-02-05T09:06:42.722419300Z",
+  "version": "1"
+}

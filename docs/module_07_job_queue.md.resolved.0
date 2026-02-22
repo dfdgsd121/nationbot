@@ -1,0 +1,176 @@
+# Module 07: Job Queue (The Muscle)
+
+> **Architect**: Senior Systems Engineer (Ex-Netflix)
+> **Cost**: $0/month (Railway Worker + Upstash Redis)
+> **Complexity**: High (Async / Reliability)
+> **Dependencies**: Module 02 (LLM), Module 04 (Agent)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+Offload slow, heavy, or scheduled tasks from the API to background workers to ensure UI responsiveness.
+
+### High-Level Flow
+```
+API / Scheduler 
+  → Enqueue Task (Redis)
+  → Celery Worker (Railway)
+  → Execute Logic (Agent/LLM)
+  → Update DB / Notify User
+```
+
+### Zero-Cost Stack
+- **Broker**: Upstash Redis (Free)
+- **Worker**: Python Celery on Railway (shared $5 credit)
+- **Result Backend**: Supabase (Postgres) or Redis
+
+---
+
+## 2. Task Definitions
+
+### Queue Priority
+1. **High**: User interactions (Reply generation, Claims)
+2. **Default**: Scheduled news reactions, routine posts
+3. **Low**: Analytics batching, pruning old data
+
+### Key Tasks
+```python
+@app.task
+def generate_reaction(news_item_id, nation_id):
+    # Calls Module 04 Agent Runtime
+    pass
+
+@app.task
+def process_claim(user_id, nation_id):
+    # Module 09 Auth + Module 08 DB
+    pass
+
+@app.task
+def broadcast_event(event_data):
+    # Module 14 Real-time
+    pass
+```
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Setup (Day 1)
+
+**Goal**: Simple Celery worker processing a dummy task.
+
+```python
+# src/worker/celery.py
+from celery import Celery
+
+app = Celery('nationbot', broker=os.getenv('REDIS_URL'))
+
+@app.task
+def add(x, y):
+    return x + y
+```
+
+**Acceptance**: Task added via queue returns result.
+
+---
+
+### Phase 1: Robustness (Day 2-4)
+
+**Goal**: Retries, Dead Letter Queues (DLQ), and Timeouts.
+
+**Configuration**:
+```python
+app.conf.update(
+    task_serializer='json',
+    task_acks_late=True,
+    worker_prefetch_multiplier=1, # Fair dispatch
+    task_default_queue='default',
+    task_queues=(
+        Queue('high', routing_key='high'),
+        Queue('default', routing_key='default'),
+    ),
+    task_routes={
+        'src.tasks.user.*': {'queue': 'high'},
+        'src.tasks.llm.*': {'queue': 'default'},
+    }
+)
+```
+
+**Retry Logic**:
+```python
+@app.task(bind=True, max_retries=3)
+def robust_task(self):
+    try:
+        external_api_call()
+    except ConnectionError as exc:
+        raise self.retry(exc=exc, countdown=60) # Exponential backoff
+```
+
+**Acceptance**: Failed task retries 3 times then logs to DLQ.
+
+---
+
+### Phase 2: Integration (Day 5-6)
+
+**Goal**: Connect API (Producer) → Worker (Consumer).
+
+**Producer (FastAPI)**:
+```python
+from src.worker.tasks import generate_reaction
+
+@app.post("/test-trigger")
+async def trigger():
+    generate_reaction.apply_async(
+        args=["news_123", "USA"], 
+        queue='high'
+    )
+    return {"status": "queued"}
+```
+
+**Acceptance**: API call triggers worker log output "Generating reaction...".
+
+---
+
+### Phase 3: Scaling (Day 7-8)
+
+**Goal**: Concurrency management on limited hardware.
+
+**Zero-Cost Constraints**:
+- Railway container has ~512MB RAM.
+- Use `gevent` execution pool for I/O bound tasks (LLM calls) instead of `prefork` (RAM heavy).
+
+```bash
+# Start command
+celery -A src.worker.app worker --pool=gevent --concurrency=20 --loglevel=info
+```
+
+**Acceptance**: Handle 20 concurrent LLM waits without OOM kill.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Worker Crash | Task lost? | `acks_late=True` ensures task stays in Redis until finished |
+| Redis Full | Enqueue fails | Drop Low priority tasks first |
+| LLM Timeout | Worker hangs | Hard timelimit `time_limit=300` on tasks |
+
+---
+
+## 5. Testing
+
+**Unit Tests**:
+```python
+def test_task_execution():
+    # Use eager mode to run locally without worker
+    app.conf.task_always_eager = True
+    result = add.delay(2, 2)
+    assert result.get() == 4
+```
+
+---
+
+*Module 07 Complete | Next: Module 08 (Database)*

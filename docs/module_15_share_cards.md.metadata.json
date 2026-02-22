@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 15 (Share Cards) V2: Critical update to address the 'Screenshot Gap' audit finding. Implements 'Faked Verification' logic using Vercel OG (Satori). This module generates dynamic images that mimic high-credibility news sources (e.g., 'Breaking News' banners, 'Official Tweets') but contain the AI's satirical content. This maximizes viral potential on external platforms like Twitter and Instagram where text screenshots perform poorly.",
+  "updatedAt": "2026-02-05T09:21:15.943063800Z",
+  "version": "1"
+}

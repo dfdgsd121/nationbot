@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 06 (API Gateway) V2: Critical update to enforce 'Async-First' architecture. All endpoints related to agent interactions (POST /interact) now strictly blindly dispatch to the Job Queue (Module 07) and return 202 Accepted. Prevents HTTP timeouts for long-running chain-of-thought processes.",
+  "updatedAt": "2026-02-05T08:39:02.992065900Z",
+  "version": "1"
+}

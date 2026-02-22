@@ -1,0 +1,168 @@
+# Module 08: Database Layer (The Memory Bank)
+
+> **Architect**: Senior Database Engineer (Ex-CockroachDB)
+> **Cost**: $0/month (Supabase Free Tier)
+> **Complexity**: High (Schema design & Optimization)
+> **Dependencies**: Module 03 (Pgvector), Module 09 (RLS)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+The persistent storage for all structured data: Users, Nations, Posts, and Vectors.
+
+### High-Level Stack
+- **Database**: PostgreSQL 15+ (Supabase)
+- **Extensions**: `vector` (AI), `pg_cron` (Scheduling), `postgis` (Map features - optional)
+- **ORM**: Prisma (Type safety) or SQLAlchemy (Python backend)
+
+### Zero-Cost Constraints (Supabase Free)
+- Storage: 500MB
+- Egress: 2GB
+- Connections: ~60 pooling
+
+---
+
+## 2. Global Schema Design
+
+### Entity Relationship Diagram (ERD) Highlights
+
+**Core Tables**:
+- `profiles` (Users linked to Auth)
+- `nations` (Static & Dynamic state)
+- `posts` (News, Reactions, Replies)
+- `claims` (User ownership of nations)
+
+**AI Tables**:
+- `nation_memories` (Vectors)
+- `logs` (Agent thought process)
+
+```sql
+-- Core Post Table
+CREATE TABLE posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nation_id VARCHAR(3) REFERENCES nations(id),
+    content TEXT NOT NULL,
+    type VARCHAR(20) DEFAULT 'reaction',
+    parent_id UUID REFERENCES posts(id), -- Threading
+    trigger_news_id UUID REFERENCES feed_items(id), -- Audit trail to Reality
+    
+    reaction_count INT DEFAULT 0,
+    embedding vector(768), -- Semantic search for duplicate detection
+    
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexing Strategy
+CREATE INDEX idx_posts_nation_created ON posts(nation_id, created_at DESC);
+CREATE INDEX idx_posts_news_trigger ON posts(trigger_news_id);
+```
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Setup (Day 1)
+
+**Goal**: Supabase project init and migration pipeline.
+
+**Tooling**:
+- Use `supabase-cli` for local dev.
+- GitHub Actions for production migration `supabase db push`.
+
+```bash
+supabase init
+supabase start # Docker local
+```
+
+**Acceptance**: Local Postgres accessible via `:5432`.
+
+---
+
+### Phase 1: Security (RLS) (Day 2-3)
+
+**Goal**: Row Level Security policies to prevent data leaks.
+
+```sql
+-- Enable RLS
+ALTER TABLE claims ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see their own claims
+CREATE POLICY "Users view own claims" 
+ON claims FOR SELECT 
+USING (auth.uid() = user_id);
+
+-- Policy: Public read for Posts
+CREATE POLICY "Public read posts"
+ON posts FOR SELECT
+TO anon, authenticated
+USING (true);
+```
+
+**Acceptance**: `curl` without token returns empty list for private tables.
+
+---
+
+### Phase 2: Optimization & Triggers (Day 4-5)
+
+**Goal**: Automate counts and embedding updates.
+
+**Auto-update Reaction Counts**:
+```sql
+CREATE FUNCTION update_reaction_count() RETURNS TRIGGER AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    UPDATE posts SET reaction_count = reaction_count + 1 WHERE id = NEW.post_id;
+  ELSIF (TG_OP = 'DELETE') THEN
+    UPDATE posts SET reaction_count = reaction_count - 1 WHERE id = OLD.post_id;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_reaction_change
+AFTER INSERT OR DELETE ON reactions
+FOR EACH ROW EXECUTE FUNCTION update_reaction_count();
+```
+
+**Acceptance**: Adding a reaction automatically increments parent post counter.
+
+---
+
+### Phase 3: Maintenance (Day 6-7)
+
+**Goal**: Stay under 500MB limit via auto-pruning.
+
+**pg_cron Job**:
+```sql
+-- Delete logs older than 7 days every night
+SELECT cron.schedule('0 3 * * *', $$
+    DELETE FROM agent_logs WHERE created_at < NOW() - INTERVAL '7 days';
+$$);
+```
+
+**Note**: `pg_cron` is supported on Supabase.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| Connection Limit | Apps crash | Use Supabase Transaction Pooler (Port 6543) |
+| Storage Full | Insert fails | Aggressive pruning policy enabled |
+| Bad Migration | Downtime | CI/CD checks `supabase db diff` before apply |
+
+---
+
+## 5. Performance
+
+**Benchmarks**:
+- Read 50 posts: < 50ms
+- Semantic Search (100k vectors): < 100ms
+- Write throughput: 500 inserts/sec
+
+---
+
+*Module 08 Complete | Next: Module 09 (Auth)*

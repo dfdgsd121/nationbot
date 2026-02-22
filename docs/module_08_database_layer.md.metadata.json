@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 08 (Database Layer) V2: Critical update to address the 'Vendor Lock-in Risk' audit finding. Introduces a 'Repository Pattern' abstraction layer effectively decoupling the core application logic from Supabase-specific features (like direct RLS dependency for business logic). This allows for future migration to RDS/Aurora without a total rewrite.",
+  "updatedAt": "2026-02-05T09:02:06.356449300Z",
+  "version": "1"
+}

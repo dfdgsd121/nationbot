@@ -1,0 +1,96 @@
+# Module 19: Premium Wiretap (The Money Printer)
+
+> **Architect**: Product Manager (Ex-Spotify)
+> **Cost**: $0 (Logging existing data)
+> **Benefit**: High Conversion Rate (Curiosity Gap)
+> **Dependencies**: Module 04 (Agent), Module 09 (Auth)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+Users love seeing "how the sausage is made." We monetize this curiosity by selling a "Wiretap" into the Situation Room.
+It turns debug logs into a feature.
+
+### High-Level Flow
+```
+Agent Decision Cycle
+  → 1. Retrieve Context ("Recall: Trade War 2018")
+  → 2. Analyze Sentiment ("Anger: 85%")
+  → 3. Draft Options ("Option A: Threaten", "Option B: Ignore")
+  → 4. Select Final ("Option A")
+  
+  → SAVE all steps to `wiretap_logs` (Redis/DB)
+  
+Frontend (Premium User)
+  → Subscribe to `wiretap:US` (SSE)
+  → Receive real-time "Thought Stream"
+```
+
+---
+
+## 2. The "Thought" Data Model
+
+We don't just show text; we show *variables*.
+
+```json
+{
+  "nation_id": "US",
+  "event_id": "evt_123",
+  "step": "ANALYSIS",
+  "data": {
+    "detected_threat": "HIGH",
+    "relevant_memory": ["Pearl Harbor", "9/11"],
+    "current_mood": "Paranoid",
+    "strategy": "Escalate"
+  }
+}
+```
+
+---
+
+## 3. Implementation Logic
+
+### A. The Logger (Decorator)
+We wrap the Agent's `act()` method.
+
+```python
+class WiretapLogger:
+    async def log_thought(self, nation_id, step, thoughts: dict):
+        # Fire and forget to Redis PubSub
+        channel = f"wiretap:{nation_id}"
+        await self.redis.publish(channel, json.dumps({
+            "type": "THOUGHT_STREAM",
+            "content": thoughts,
+            "timestamp": now()
+        }))
+```
+
+### B. The Gatekeeper (API)
+```python
+@router.websocket("/ws/wiretap/{nation_id}")
+async def wiretap_stream(websocket: WebSocket, token: str):
+    user = await auth.verify(token)
+    if user.tier != 'PREMIUM':
+        await websocket.close(code=4003, reason="Payment Required")
+        return
+        
+    await websocket.accept()
+    # Stream Redis channel to Websocket
+```
+
+---
+
+## 4. UI Visualization (Terminal Style)
+*   **Font**: Matrix Green / Terminal Monospace.
+*   **Animation**: Typing effect.
+*   **Content**:
+    *   `> INCOMING INTEL...`
+    *   `> PARSING...`
+    *   `> THREAT DETECTED.`
+    *   `> GENERATING RESPONSE...`
+
+---
+
+*Module 19 (V1) Status: SPECIFIED*

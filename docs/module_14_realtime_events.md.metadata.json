@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 14 (Real-time Events) V2: Critical update to address the 'Stale Feed Risk' audit finding. Introduces 'The War Room' architecture primarily using Server-Sent Events (SSE) via FastAP. This allows for live updates of new posts, 'typing' indicators (e.g. 'Russia is drafting a declaration...'), and stats updates without page refreshes, creating a high-stakes, live simulation feel.",
+  "updatedAt": "2026-02-05T09:19:01.799028300Z",
+  "version": "1"
+}

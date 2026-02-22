@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NationBot | Geopolitical Chaos Simulator</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ===== RESET + BASE ===== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-deep: #050507;
+            --bg-card: #0a0c10;
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent: #00f0ff;
+            --accent2: #7000ff;
+            --text: #e2e8f0;
+            --text-dim: rgba(255, 255, 255, 0.4);
+            --text-dimmer: rgba(255, 255, 255, 0.2);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-deep);
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(112, 0, 255, 0.05) 0%, transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 240, 255, 0.05) 0%, transparent 25%);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== SCROLLBAR ===== */
+        .scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            height: 48px;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(5, 5, 7, 0.9);
+            backdrop-filter: blur(12px);
+            z-index: 50;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo {
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        .badge {
+            font-size: 9px;
+            font-family: 'JetBrains Mono';
+            color: var(--text-dimmer);
+            border: 1px solid var(--glass-border);
+            padding: 1px 6px;
+            border-radius: 3px;
+        }
+
+        .stats {
+            font-size: 10px;
+            font-family: 'JetBrains Mono';
+            color: var(--text-dimmer);
+        }
+
+        /* SSE indicator */
+        .sse-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+
+        .sse-dot.online {
+            background: #22c55e;
+            box-shadow: 0 0 6px #22c55e;
+        }
+
+        /* ===== SEARCH ===== */
+        .search-wrap {
+            position: relative;
+            width: 240px;
+        }
+
+        .search-wrap::before {
+            content: '🔍';
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 5px 10px 5px 28px;
+            font-size: 11px;
+            font-family: 'Inter';
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: rgba(0, 240, 255, 0.4);
+        }
+
+        /* Search results banner */
+        .search-banner {
+            display: none;
+            padding: 6px 16px;
+            background: rgba(0, 240, 255, 0.06);
+            border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+            font-size: 11px;
+            color: var(--accent);
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-banner.active {
+            display: flex;
+        }
+
+        .search-clear {
+            cursor: pointer;
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        .search-clear:hover {
+            color: var(--text);
+        }
+
+        /* ===== TABS ===== */
+        .tab {
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            border: 1px solid var(--glass-border);
+            background: transparent;
+            color: var(--text-dim);
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: rgba(0, 240, 255, 0.1);
+            border-color: rgba(0, 240, 255, 0.3);
+            color: var(--accent);
+        }
+
+        .tab:hover {
+            color: var(--text);
+        }
+
+        /* ===== CHAOS BUTTON ===== */
+        .chaos-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--glass-border);
+            font-size: 10px;
+            font-family: 'JetBrains Mono';
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chaos-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .chaos-btn.on {
+            border-color: rgba(0, 240, 255, 0.4);
+            animation: pulseGlow 1.5s ease-in-out infinite;
+        }
+
+        .chaos-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .chaos-btn.on .chaos-dot {
+            background: var(--accent);
+        }
+
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 4px rgba(0, 240, 255, 0.2);
+            }
+
+            50% {
+                box-shadow: 0 0 16px rgba(0, 240, 255, 0.5);
+            }
+        }
+
+        /* ===== LAYOUT ===== */
+        .layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* ===== LEFT SIDEBAR ===== */
+        .sidebar-left {
+            width: 260px;
+            min-width: 260px;
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .section-title {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-dim);
+            margin: 8px 0 4px;
+        }
+
+        .section-title.cyan {
+            color: var(--accent);
+        }
+
+        .section-title.red {
+            color: #ef4444;
+        }
+
+        /* Nation grid */
+        .region-label {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: rgba(255, 255, 255, 0.2);
+            padding: 6px 0 2px;
+        }
+
+        .nation-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3px;
+            margin-bottom: 2px;
+        }
+
+        .nation-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 6px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            transition: all 0.15s;
+            position: relative;
+        }
+
+        .nation-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(0, 240, 255, 0.2);
+            color: var(--text);
+        }
+
+        .nation-btn .flag {
+            font-size: 14px;
+        }
+
+        .nation-btn.following {
+            border-color: rgba(0, 240, 255, 0.4);
+            background: rgba(0, 240, 255, 0.06);
+        }
+
+        .follow-indicator {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+        }
+
+        .nation-btn.following .follow-indicator {
+            background: var(--accent);
+            box-shadow: 0 0 4px var(--accent);
+        }
+
+        /* Controls */
+        .control-box {
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+
+        .control-box.cyan {
+            background: rgba(0, 240, 255, 0.03);
+            border: 1px solid rgba(0, 240, 255, 0.12);
+        }
+
+        .control-box.red {
+            background: rgba(239, 68, 68, 0.03);
+            border: 1px solid rgba(239, 68, 68, 0.12);
+        }
+
+        .ctrl-input {
+            width: 100%;
+            background: transparent;
+            font-size: 11px;
+            color: var(--text);
+            outline: none;
+            border: none;
+            margin-bottom: 6px;
+            font-family: 'Inter';
+        }
+
+        .ctrl-input::placeholder {
+            color: rgba(255, 255, 255, 0.15);
+        }
+
+        .ctrl-row {
+            display: flex;
+            gap: 4px;
+        }
+
+        .ctrl-btn {
+            flex: 1;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .ctrl-btn.cyan {
+            background: rgba(0, 240, 255, 0.15);
+            color: var(--accent);
+        }
+
+        .ctrl-btn.cyan:hover {
+            background: rgba(0, 240, 255, 0.25);
+        }
+
+        .ctrl-btn.purple {
+            background: rgba(112, 0, 255, 0.15);
+            color: #a855f7;
+        }
+
+        .ctrl-btn.purple:hover {
+            background: rgba(112, 0, 255, 0.25);
+        }
+
+        .ctrl-btn.red {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            width: 100%;
+        }
+
+        .ctrl-btn.red:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
+        textarea.ctrl-input {
+            resize: none;
+            height: 48px;
+        }
+
+        /* ===== MAIN FEED ===== */
+        .feed-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .feed {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 0;
+            opacity: 0.25;
+        }
+
+        .empty-state .icon {
+            font-size: 32px;
+            margin-bottom: 6px;
+        }
+
+        .empty-state .label {
+            font-size: 11px;
+            font-family: 'JetBrains Mono';
+            text-transform: uppercase;
+        }
+
+        /* ===== POST CARD ===== */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .post-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 12px;
+            animation: slideIn 0.25s ease-out;
+            transition: border-color 0.2s;
+        }
+
+        .post-card:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+
+        .post-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            flex-shrink: 0;
+        }
+
+        .post-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .post-handle {
+            font-size: 9px;
+            font-family: 'JetBrains Mono';
+            color: var(--text-dimmer);
+        }
+
+        .post-time {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.12);
+            font-family: 'JetBrains Mono';
+            margin-left: auto;
+        }
+
+        .rep-badge {
+            font-size: 8px;
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono';
+        }
+
+        .proof-tag {
+            font-size: 8px;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .proof-tag.requested {
+            background: rgba(255, 165, 0, 0.12);
+            color: #ffa500;
+            border: 1px solid rgba(255, 165, 0, 0.25);
+        }
+
+        .proof-tag.answered {
+            background: rgba(0, 255, 100, 0.08);
+            color: #00ff64;
+            border: 1px solid rgba(0, 255, 100, 0.2);
+        }
+
+        .meta-tag {
+            font-size: 8px;
+            color: rgba(168, 85, 247, 0.5);
+            font-family: 'JetBrains Mono';
+        }
+
+        .post-news {
+            font-size: 10px;
+            color: #ef4444;
+            font-weight: 700;
+            margin-bottom: 3px;
+            letter-spacing: 0.02em;
+        }
+
+        .post-content {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.55;
+            font-weight: 300;
+        }
+
+        .post-trace {
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.1);
+            font-family: 'JetBrains Mono';
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .post-trace:hover {
+            color: rgba(0, 240, 255, 0.5);
+        }
+
+        /* Reply indicator */
+        .reply-context {
+            font-size: 9px;
+            color: var(--text-dimmer);
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Action buttons */
+        .post-actions {
+            display: flex;
+            gap: 2px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .act-btn {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            color: var(--text-dim);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            font-family: 'Inter';
+        }
+
+        .act-btn:hover {
+            transform: scale(1.03);
+        }
+
+        .act-btn.like:hover {
+            color: #ec4899;
+            background: rgba(236, 72, 153, 0.1);
+        }
+
+        .act-btn.boost:hover {
+            color: #eab308;
+            background: rgba(234, 179, 8, 0.1);
+        }
+
+        .act-btn.fork:hover {
+            color: #a855f7;
+            background: rgba(168, 85, 247, 0.1);
+        }
+
+        .act-btn.proof:hover {
+            color: #f97316;
+            background: rgba(249, 115, 22, 0.1);
+        }
+
+        .act-btn.reply:hover {
+            color: var(--accent);
+            background: rgba(0, 240, 255, 0.1);
+        }
+
+        /* ===== REPLIES (flat, max 1 level indent) ===== */
+        .replies-zone {
+            margin-top: 6px;
+            padding-left: 16px;
+            border-left: 2px solid rgba(0, 240, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .reply-card {
+            padding: 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            animation: slideIn 0.25s ease-out;
+        }
+
+        /* ===== PROOF CARD (inline, visible) ===== */
+        .proof-card {
+            margin-top: 6px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: rgba(249, 115, 22, 0.04);
+            border: 1px solid rgba(249, 115, 22, 0.15);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .proof-card .proof-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #f97316;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* ===== RIGHT SIDEBAR ===== */
+        .sidebar-right {
+            width: 240px;
+            min-width: 240px;
+            border-left: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .leaderboard-area {
+            padding: 10px;
+            overflow-y: auto;
+            flex: 0 0 auto;
+            max-height: 50%;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .lb-entry {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 6px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.02);
+            margin-bottom: 2px;
+            font-size: 10px;
+        }
+
+        .lb-entry:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .lb-rank {
+            font-family: 'JetBrains Mono';
+            font-weight: 700;
+            color: var(--text-dimmer);
+            width: 18px;
+            text-align: center;
+            font-size: 9px;
+        }
+
+        .lb-entry:nth-child(1) .lb-rank {
+            color: #ffd700;
+        }
+
+        .lb-entry:nth-child(2) .lb-rank {
+            color: #c0c0c0;
+        }
+
+        .lb-entry:nth-child(3) .lb-rank {
+            color: #cd7f32;
+        }
+
+        .lb-name {
+            font-size: 10px;
+            font-weight: 600;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .lb-score {
+            font-family: 'JetBrains Mono';
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .lb-tier {
+            font-size: 8px;
+            color: var(--text-dim);
+        }
+
+        .log-area {
+            padding: 10px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .log-line {
+            font-family: 'JetBrains Mono';
+            font-size: 9px;
+            color: var(--text-dimmer);
+            margin-bottom: 1px;
+            word-break: break-all;
+        }
+
+        /* ===== TOAST ===== */
+        .toast-container {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .toast {
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 500;
+            background: rgba(13, 17, 23, 0.95);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(8px);
+            color: var(--text);
+            animation: slideIn 0.25s ease-out;
+            transition: opacity 0.3s;
+        }
+
+        /* ===== TRACE MODAL ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            max-width: 560px;
+            width: 90%;
+            max-height: 75vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .modal-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: var(--text);
+        }
+
+        .modal-meta {
+            font-size: 9px;
+            font-family: 'JetBrains Mono';
+            color: var(--text-dimmer);
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .chain-post {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 6px;
+        }
+
+        .chain-post.indented {
+            margin-left: 16px;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1024px) {
+            .sidebar-right {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar-left {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-left">
+            <div
+                style="width:3px;height:24px;background:linear-gradient(to bottom,var(--accent),var(--accent2));border-radius:2px">
+            </div>
+            <div class="logo">NATION<span>BOT</span></div>
+            <div class="badge">v5 PRD</div>
+        </div>
+        <div class="search-wrap">
+            <input class="search-input" id="searchInput" placeholder="Search posts, nations..."
+                onkeydown="if(event.key==='Enter')doSearch()">
+        </div>
+        <div class="header-right">
+            <button class="tab active" id="tabAll" onclick="switchTab('all')">All</button>
+            <button class="tab" id="tabFollowing" onclick="switchTab('following')">Following</button>
+            <div class="stats"><span id="statNations">25</span> nations · <span id="statPosts">0</span> posts</div>
+            <div class="sse-dot" id="sseDot" title="SSE Connection"></div>
+            <button class="chaos-btn" id="chaosBtn" onclick="toggleChaos()">
+                <div class="chaos-dot"></div>
+                <span id="chaosLabel">CHAOS: OFF</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- SEARCH BANNER -->
+    <div class="search-banner" id="searchBanner">
+        <span id="searchBannerText"></span>
+        <span class="search-clear" onclick="clearSearch()">✕ Clear</span>
+    </div>
+
+    <!-- LAYOUT -->
+    <div class="layout">
+        <!-- LEFT SIDEBAR -->
+        <div class="sidebar-left scroll">
+            <div class="section-title">Nations <span style="font-weight:400;font-size:8px">(click = post · right-click =
+                    follow)</span></div>
+            <div id="nationGrid"></div>
+
+            <div class="section-title cyan" style="margin-top:10px">Thread Generator</div>
+            <div class="control-box cyan">
+                <input class="ctrl-input" id="threadTopic" placeholder="Topic (optional)...">
+                <div class="ctrl-row">
+                    <button class="ctrl-btn cyan" onclick="triggerThread(3)">3-Deep</button>
+                    <button class="ctrl-btn purple" onclick="triggerThread(5)">5-Deep</button>
+                </div>
+            </div>
+
+            <div class="section-title red">News Injection</div>
+            <div class="control-box red">
+                <textarea class="ctrl-input" id="newsInput" placeholder="Breaking event..."></textarea>
+                <button class="ctrl-btn red" onclick="triggerNews()">Inject (5-8 reactions)</button>
+            </div>
+        </div>
+
+        <!-- MAIN FEED -->
+        <div class="feed-area">
+            <div class="feed scroll" id="feed">
+                <div class="empty-state" id="emptyState">
+                    <div class="icon">📡</div>
+                    <div class="label">Awaiting Data Stream...</div>
+                    <div style="font-size:10px;margin-top:4px;color:rgba(255,255,255,0.15)">Click a nation or enable
+                        Chaos Mode</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDEBAR -->
+        <div class="sidebar-right">
+            <div class="leaderboard-area scroll">
+                <div class="section-title" style="color:#eab308">🏆 Leaderboard</div>
+                <div id="leaderboard"></div>
+            </div>
+            <div class="log-area scroll">
+                <div class="section-title cyan">System Log</div>
+                <div id="sysLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TRACE MODAL -->
+    <div class="modal-overlay" id="traceModal" onclick="if(event.target===this)closeTrace()">
+        <div class="modal-box scroll" id="traceContent"></div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toasts"></div>
+
+    <script>
+        const API = 'http://localhost:8000';
+
+        const NATIONS_BY_REGION = {
+            "Americas": [
+                { id: 'US', flag: '🇺🇸', name: 'United States' }, { id: 'CA', flag: '🇨🇦', name: 'Canada' },
+                { id: 'MX', flag: '🇲🇽', name: 'Mexico' }, { id: 'BR', flag: '🇧🇷', name: 'Brazil' },
+                { id: 'AR', flag: '🇦🇷', name: 'Argentina' },
+            ],
+            "Europe": [
+                { id: 'UK', flag: '🇬🇧', name: 'United Kingdom' }, { id: 'FR', flag: '🇫🇷', name: 'France' },
+                { id: 'DE', flag: '🇩🇪', name: 'Germany' }, { id: 'IT', flag: '🇮🇹', name: 'Italy' },
+                { id: 'ES', flag: '🇪🇸', name: 'Spain' }, { id: 'PL', flag: '🇵🇱', name: 'Poland' },
+                { id: 'UA', flag: '🇺🇦', name: 'Ukraine' },
+            ],
+            "Eurasia": [{ id: 'RU', flag: '🇷🇺', name: 'Russia' }],
+            "Asia-Pacific": [
+                { id: 'CN', flag: '🇨🇳', name: 'China' }, { id: 'JP', flag: '🇯🇵', name: 'Japan' },
+                { id: 'IN', flag: '🇮🇳', name: 'India' }, { id: 'KR', flag: '🇰🇷', name: 'South Korea' },
+                { id: 'KP', flag: '🇰🇵', name: 'North Korea' }, { id: 'AU', flag: '🇦🇺', name: 'Australia' },
+                { id: 'ID', flag: '🇮🇩', name: 'Indonesia' },
+            ],
+            "Middle East": [
+                { id: 'SA', flag: '🇸🇦', name: 'Saudi Arabia' }, { id: 'IR', flag: '🇮🇷', name: 'Iran' },
+                { id: 'IL', flag: '🇮🇱', name: 'Israel' }, { id: 'TR', flag: '🇹🇷', name: 'Turkey' },
+                { id: 'EG', flag: '🇪🇬', name: 'Egypt' },
+            ],
+        };
+        const ALL_NATIONS = Object.values(NATIONS_BY_REGION).flat();
+
+        // State
+        let posts = new Map();       // id -> post object
+        let postCount = 0;
+        let followed = new Set();
+        let activeTab = 'all';
+        let searching = false;
+        let chaosMode = false;
+        let chaosTimer = null;
+
+        // ===== INIT =====
+        document.addEventListener('DOMContentLoaded', () => {
+            buildNationGrid();
+            connectSSE();
+            refreshLeaderboard();
+            setInterval(refreshLeaderboard, 12000);
+            syslog('System online — 25 nations ready.');
+        });
+
+        // ===== NATION GRID =====
+        function buildNationGrid() {
+            const el = document.getElementById('nationGrid');
+            let html = '';
+            for (const [region, nations] of Object.entries(NATIONS_BY_REGION)) {
+                html += `<div class="region-label">${region}</div><div class="nation-grid">`;
+                nations.forEach(n => {
+                    html += `<div class="nation-btn" id="nb-${n.id}" onclick="doPost('${n.id}')" oncontextmenu="event.preventDefault();toggleFollow('${n.id}')" title="Click=post · Right-click=follow">
+                <span class="follow-indicator"></span>
+                <span class="flag">${n.flag}</span><span>${n.id}</span>
+            </div>`;
+                });
+                html += '</div>';
+            }
+            el.innerHTML = html;
+        }
+
+        // ===== SSE =====
+        function connectSSE() {
+            const dot = document.getElementById('sseDot');
+            const es = new EventSource(`${API}/v1/stream/feed`);
+            es.onopen = () => { dot.classList.add('online'); syslog('SSE connected.'); };
+            es.addEventListener('new_post', e => onNewPost(JSON.parse(e.data)));
+            es.onerror = () => { dot.classList.remove('online'); };
+        }
+
+        // ===== HANDLE NEW POST =====
+        function onNewPost(post) {
+            posts.set(post.id, post);
+            postCount++;
+            document.getElementById('statPosts').textContent = postCount;
+
+            // Don't render if searching or wrong tab
+            if (searching) return;
+            if (activeTab === 'following' && !followed.has(post.nation_id)) return;
+
+            const emptyState = document.getElementById('emptyState');
+            if (emptyState) emptyState.remove();
+
+            // ALL replies rendered FLAT under the ROOT post — no deep nesting
+            if (post.reply_to) {
+                // Find the root post of this chain
+                let rootId = post.reply_to;
+                const visited = new Set();
+                while (true) {
+                    const parentPost = posts.get(rootId);
+                    if (!parentPost || !parentPost.reply_to || visited.has(rootId)) break;
+                    visited.add(rootId);
+                    rootId = parentPost.reply_to;
+                }
+                // Append as flat reply under root wrapper
+                const rootWrapper = document.getElementById(`pw-${rootId}`);
+                if (rootWrapper) {
+                    const zone = rootWrapper.querySelector('.replies-zone');
+                    if (zone) {
+                        zone.insertAdjacentHTML('beforeend', replyHTML(post));
+                        // Update reply count
+                        const countEl = rootWrapper.querySelector('.reply-count');
+                        if (countEl) countEl.textContent = zone.children.length;
+                        return;
+                    }
+                }
+                // Fallback: render as root if parent not found
+            }
+
+            // Render as root post
+            const feed = document.getElementById('feed');
+            feed.insertAdjacentHTML('afterbegin', rootPostHTML(post));
+        }
+
+        // ===== POST HTML =====
+        function rootPostHTML(post) {
+            return `<div class="post-card" id="pw-${post.id}">
+        ${postInnerHTML(post)}
+        <div class="replies-zone"></div>
+    </div>`;
+        }
+
+        function replyHTML(post) {
+            const parentPost = posts.get(post.reply_to);
+            const parentName = parentPost ? parentPost.nation_name : '...';
+            return `<div class="reply-card" id="pw-${post.id}">
+        <div class="reply-context">↳ replying to <strong>${parentName}</strong></div>
+        ${postInnerHTML(post, true)}
+    </div>`;
+        }
+
+        function postInnerHTML(post, isReply = false) {
+            const proofBadge = post.proof_status === 'requested' ? '<span class="proof-tag requested">⏳ PROOF REQUESTED</span>'
+                : post.proof_status === 'answered' ? '<span class="proof-tag answered">✅ PROVEN</span>' : '';
+            const rep = post.rep_tier ? `<span class="rep-badge">${post.rep_tier} ${post.rep_score || ''}</span>` : '';
+            const meta = post.generation_meta
+                ? (post.generation_meta.forked_from ? '<span class="meta-tag">🔀 fork</span>' : '')
+                + (post.generation_meta.proof_for ? '<span class="meta-tag">🛡️ defense</span>' : '')
+                : '';
+            const traceSnippet = post.trace_id ? post.trace_id.substring(0, 8) + '…' : '';
+
+            return `
+        <div class="post-header">
+            <div class="post-avatar">${post.flag}</div>
+            <span class="post-name">${post.nation_name}</span>
+            <span class="post-handle">@${post.nation_id}_GOV</span>
+            ${rep} ${proofBadge} ${meta}
+            <span class="post-trace" onclick="showTrace('${post.trace_id}')" title="View proof chain">${traceSnippet}</span>
+        </div>
+        ${post.news_reaction ? `<div class="post-news">🚨 BREAKING: ${post.news_reaction}</div>` : ''}
+        <div class="post-content">${post.content}</div>
+        <div class="post-actions">
+            <button class="act-btn like" onclick="doLike('${post.id}',this)">♥ <span>${post.likes || 0}</span></button>
+            <button class="act-btn boost" onclick="doBoost('${post.id}',this)">🚀 <span>${post.boosts || 0}</span></button>
+            <button class="act-btn fork" onclick="doFork('${post.id}')">🔀 <span>${post.forks || 0}</span></button>
+            <button class="act-btn proof" onclick="doProof('${post.id}')">🛡️ Proof</button>
+            <button class="act-btn reply" onclick="doReply('${post.id}')">↩ Reply</button>
+            ${!isReply ? `<span style="margin-left:auto;font-size:9px;color:rgba(255,255,255,0.15)" class="reply-count">0</span>` : ''}
+        </div>
+    `;
+        }
+
+        // ===== ACTIONS =====
+
+        async function doPost(nationId) {
+            syslog(`Triggering ${nationId}...`);
+            try {
+                await fetch(`${API}/v1/generate/nation-post`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nation_id: nationId })
+                });
+            } catch (e) { syslog('Error triggering post'); }
+        }
+
+        async function doLike(id, btn) {
+            const counter = btn.querySelector('span');
+            counter.textContent = parseInt(counter.textContent) + 1;
+            await fetch(`${API}/v1/generate/like/${id}`, { method: 'POST' });
+            toast('♥ Liked');
+        }
+
+        async function doBoost(id, btn) {
+            try {
+                const r = await fetch(`${API}/v1/generate/boost/${id}`, { method: 'POST' });
+                const d = await r.json();
+                if (d.status === 'success') {
+                    const counter = btn.querySelector('span');
+                    counter.textContent = d.boosts;
+                    toast(`🚀 Boosted! Rep now: ${d.nation_rep}`);
+                    refreshLeaderboard();
+                }
+            } catch (e) { syslog('Boost error'); }
+        }
+
+        async function doFork(id) {
+            toast('🔀 Forking...');
+            try {
+                const r = await fetch(`${API}/v1/generate/fork/${id}`, { method: 'POST' });
+                const d = await r.json();
+                if (d.status === 'success') {
+                    // Update fork count on the card
+                    const card = document.getElementById(`pw-${id}`);
+                    if (card) {
+                        const forkBtn = card.querySelector('.act-btn.fork span');
+                        if (forkBtn) forkBtn.textContent = parseInt(forkBtn.textContent) + 1;
+                    }
+                    toast(`🔀 ${d.fork.nation_name} remixed this post!`);
+                    refreshLeaderboard();
+                }
+            } catch (e) { syslog('Fork error'); }
+        }
+
+        async function doProof(id) {
+            toast('🛡️ Challenging — awaiting defense...');
+            try {
+                const r = await fetch(`${API}/v1/generate/request-proof/${id}`, { method: 'POST' });
+                const d = await r.json();
+                if (d.status === 'success') {
+                    // Insert proof card INLINE below the post
+                    const card = document.getElementById(`pw-${id}`);
+                    if (card) {
+                        // Update proof badge on the post
+                        const header = card.querySelector('.post-header');
+                        const existingProof = header?.querySelector('.proof-tag');
+                        if (existingProof) existingProof.remove();
+
+                        // Find the actions bar and insert proof card before the replies zone
+                        const repliesZone = card.querySelector('.replies-zone');
+                        const proofCard = document.createElement('div');
+                        proofCard.className = 'proof-card';
+                        proofCard.innerHTML = `
+                    <div class="proof-label">🛡️ DEFENSE BY ${d.proof.nation_name} ${d.proof.flag}</div>
+                    <div class="post-content">${d.proof.content}</div>
+                    <div style="margin-top:4px;font-size:9px;color:rgba(255,255,255,0.2)">✅ Proof answered · Rep +10</div>
+                `;
+                        if (repliesZone) {
+                            card.insertBefore(proofCard, repliesZone);
+                        } else {
+                            card.appendChild(proofCard);
+                        }
+                        toast(`🛡️ ${d.proof.nation_name} defended their position!`);
+                    }
+                    refreshLeaderboard();
+                }
+            } catch (e) { syslog('Proof error'); }
+        }
+
+        async function doReply(id) {
+            const nation = ALL_NATIONS[Math.floor(Math.random() * ALL_NATIONS.length)];
+            toast(`↩ ${nation.flag} ${nation.name} replying...`);
+            syslog(`${nation.id} replying to ${id.substring(0, 12)}`);
+            await fetch(`${API}/v1/generate/nation-post`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nation_id: nation.id, reply_to: id })
+            });
+        }
+
+        // ===== SEARCH =====
+        async function doSearch() {
+            const q = document.getElementById('searchInput').value.trim();
+            if (!q) return clearSearch();
+            searching = true;
+            syslog(`Searching: "${q}"`);
+            try {
+                const r = await fetch(`${API}/v1/generate/search?q=${encodeURIComponent(q)}`);
+                const d = await r.json();
+                const feed = document.getElementById('feed');
+                feed.innerHTML = '';
+                if (d.results && d.results.length > 0) {
+                    d.results.forEach(p => {
+                        posts.set(p.id, p);
+                        feed.insertAdjacentHTML('beforeend', rootPostHTML(p));
+                    });
+                } else {
+                    feed.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div class="label">No results</div></div>';
+                }
+                const banner = document.getElementById('searchBanner');
+                banner.classList.add('active');
+                document.getElementById('searchBannerText').textContent = `${d.total} result${d.total !== 1 ? 's' : ''} for "${q}"`;
+            } catch (e) { syslog('Search failed'); toast('Search failed — check backend'); }
+        }
+
+        function clearSearch() {
+            searching = false;
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchBanner').classList.remove('active');
+            rebuildFeed();
+        }
+
+        // ===== FOLLOW =====
+        async function toggleFollow(nationId) {
+            if (followed.has(nationId)) {
+                await fetch(`${API}/v1/generate/follow/${nationId}`, { method: 'DELETE' });
+                followed.delete(nationId);
+                toast(`Unfollowed ${nationId}`);
+                syslog(`Unfollowed ${nationId}`);
+            } else {
+                await fetch(`${API}/v1/generate/follow/${nationId}`, { method: 'POST' });
+                followed.add(nationId);
+                toast(`Following ${nationId} ✓`);
+                syslog(`Following ${nationId}`);
+            }
+            const btn = document.getElementById(`nb-${nationId}`);
+            if (btn) btn.classList.toggle('following', followed.has(nationId));
+            if (activeTab === 'following') loadFollowingFeed();
+        }
+
+        // ===== TABS =====
+        function switchTab(tab) {
+            activeTab = tab;
+            document.getElementById('tabAll').classList.toggle('active', tab === 'all');
+            document.getElementById('tabFollowing').classList.toggle('active', tab === 'following');
+            if (tab === 'following') loadFollowingFeed();
+            else rebuildFeed();
+        }
+
+        async function loadFollowingFeed() {
+            if (followed.size === 0) {
+                document.getElementById('feed').innerHTML = '<div class="empty-state"><div class="icon">👆</div><div class="label">Right-click nations to follow</div></div>';
+                return;
+            }
+            try {
+                const r = await fetch(`${API}/v1/generate/feed/following`);
+                const d = await r.json();
+                const feed = document.getElementById('feed');
+                feed.innerHTML = '';
+                (d.posts || []).forEach(p => { posts.set(p.id, p); feed.insertAdjacentHTML('beforeend', rootPostHTML(p)); });
+            } catch (e) { syslog('Following feed error'); }
+        }
+
+        function rebuildFeed() {
+            const feed = document.getElementById('feed');
+            feed.innerHTML = '';
+            const allPosts = Array.from(posts.values()).filter(p => !p.reply_to).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (allPosts.length === 0) {
+                feed.innerHTML = '<div class="empty-state" id="emptyState"><div class="icon">📡</div><div class="label">Awaiting Data Stream...</div></div>';
+                return;
+            }
+            allPosts.forEach(p => {
+                feed.insertAdjacentHTML('beforeend', rootPostHTML(p));
+                // Re-attach replies
+                const replies = Array.from(posts.values()).filter(rp => {
+                    // Find root of rp's chain
+                    let rootId = rp.reply_to;
+                    if (!rootId) return false;
+                    const visited = new Set();
+                    while (true) {
+                        const pp = posts.get(rootId);
+                        if (!pp || !pp.reply_to || visited.has(rootId)) break;
+                        visited.add(rootId);
+                        rootId = pp.reply_to;
+                    }
+                    return rootId === p.id;
+                });
+                if (replies.length > 0) {
+                    const zone = document.querySelector(`#pw-${p.id} .replies-zone`);
+                    if (zone) {
+                        replies.forEach(rp => zone.insertAdjacentHTML('beforeend', replyHTML(rp)));
+                        const countEl = document.querySelector(`#pw-${p.id} .reply-count`);
+                        if (countEl) countEl.textContent = replies.length;
+                    }
+                }
+            });
+        }
+
+        // ===== THREADS =====
+        async function triggerThread(depth) {
+            const topic = document.getElementById('threadTopic').value || undefined;
+            syslog(`Generating ${depth}-deep thread...`);
+            try {
+                const r = await fetch(`${API}/v1/generate/trigger-thread`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic, depth })
+                });
+                const d = await r.json();
+                syslog(`Thread: ${d.depth} posts created`);
+                document.getElementById('threadTopic').value = '';
+            } catch (e) { syslog('Thread error'); }
+        }
+
+        // ===== NEWS =====
+        async function triggerNews() {
+            const val = document.getElementById('newsInput').value.trim();
+            if (!val) return;
+            document.getElementById('newsInput').value = '';
+            syslog(`Injecting: ${val}`);
+            try {
+                const r = await fetch(`${API}/v1/generate/trigger-news`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ headline: val })
+                });
+                const d = await r.json();
+                syslog(`${d.reactions?.length || 0} reactions generated`);
+            } catch (e) { syslog('News error'); }
+        }
+
+        // ===== TRACE =====
+        async function showTrace(traceId) {
+            if (!traceId) return;
+            try {
+                const r = await fetch(`${API}/v1/generate/trace/${traceId}`);
+                const d = await r.json();
+                let html = `<div class="modal-header">
+            <div class="modal-title">🔗 Proof Chain</div>
+            <button class="modal-close" onclick="closeTrace()">✕</button>
+        </div>
+        <div class="modal-meta">
+            Trace: ${traceId}<br>
+            Depth: ${d.depth} posts · ${d.nations_involved?.length || 0} nations<br>
+            Type: ${d.lineage?.type || 'unknown'}
+            ${d.lineage?.has_forks ? ' · 🔀 forks' : ''}
+            ${d.lineage?.has_proofs ? ' · 🛡️ proofs' : ''}
+            ${d.lineage?.has_news_trigger ? ' · 🚨 news' : ''}
+        </div>`;
+                if (d.chain?.length > 0) {
+                    d.chain.forEach((p, i) => {
+                        html += `<div class="chain-post ${i > 0 ? 'indented' : ''}">
+                    <div class="post-header"><div class="post-avatar" style="width:24px;height:24px;font-size:12px">${p.flag}</div>
+                    <span class="post-name" style="font-size:11px">${p.nation_name}</span>
+                    <span class="post-handle">@${p.nation_id}_GOV</span>
+                    ${p.rep_tier ? `<span class="rep-badge">${p.rep_tier}</span>` : ''}</div>
+                    ${p.news_reaction ? `<div class="post-news" style="font-size:9px">🚨 ${p.news_reaction}</div>` : ''}
+                    <div class="post-content" style="font-size:11px">${p.content}</div>
+                    <div style="font-size:8px;color:rgba(255,255,255,0.15);margin-top:4px">♥ ${p.likes} · 🚀 ${p.boosts || 0} · 🔀 ${p.forks || 0}</div>
+                </div>`;
+                    });
+                } else {
+                    html += '<div class="empty-state" style="padding:20px"><div class="label">No posts in trace</div></div>';
+                }
+                document.getElementById('traceContent').innerHTML = html;
+                document.getElementById('traceModal').classList.add('show');
+            } catch (e) { syslog('Trace error'); }
+        }
+        function closeTrace() { document.getElementById('traceModal').classList.remove('show'); }
+
+        // ===== LEADERBOARD =====
+        async function refreshLeaderboard() {
+            try {
+                const r = await fetch(`${API}/v1/generate/leaderboard`);
+                const d = await r.json();
+                const el = document.getElementById('leaderboard');
+                if (!d.leaderboard?.length) { el.innerHTML = '<div style="font-size:10px;color:rgba(255,255,255,0.15)">No data yet</div>'; return; }
+                el.innerHTML = d.leaderboard.slice(0, 12).map(n => `
+            <div class="lb-entry">
+                <span class="lb-rank">#${n.rank}</span>
+                <span style="font-size:14px">${n.flag}</span>
+                <div style="flex:1;min-width:0"><div class="lb-name">${n.name}</div><div class="lb-tier">${n.tier}</div></div>
+                <span class="lb-score">${n.score}</span>
+            </div>
+        `).join('');
+            } catch (e) { /* offline */ }
+        }
+
+        // ===== CHAOS =====
+        function toggleChaos() {
+            chaosMode = !chaosMode;
+            const btn = document.getElementById('chaosBtn');
+            document.getElementById('chaosLabel').textContent = chaosMode ? 'CHAOS: ON' : 'CHAOS: OFF';
+            btn.classList.toggle('on', chaosMode);
+            if (chaosMode) {
+                syslog('⚡ CHAOS MODE — auto-threading');
+                runChaos();
+                chaosTimer = setInterval(runChaos, 6000);
+            } else {
+                clearInterval(chaosTimer);
+                syslog('Chaos OFF');
+            }
+        }
+        function runChaos() {
+            const topics = ['the global economy', 'climate change', 'AI regulation', 'social media bans', 'space race', 'oil prices',
+                'military spending', 'grain exports', 'tech monopolies', 'currency wars', 'nuclear energy', 'water rights', 'trade sanctions', 'border disputes'];
+            if (Math.random() > 0.4) {
+                const topic = topics[Math.floor(Math.random() * topics.length)];
+                fetch(`${API}/v1/generate/trigger-thread`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic, depth: Math.floor(Math.random() * 3) + 2 })
+                });
+                syslog(`⚡ Thread: "${topic}"`);
+            } else {
+                const n = ALL_NATIONS[Math.floor(Math.random() * ALL_NATIONS.length)];
+                doPost(n.id);
+            }
+        }
+
+        // ===== TOAST =====
+        function toast(msg) {
+            const c = document.getElementById('toasts');
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.remove(), 300); }, 2500);
+        }
+
+        // ===== SYSLOG =====
+        function syslog(msg) {
+            const div = document.getElementById('sysLog');
+            const p = document.createElement('div');
+            p.className = 'log-line';
+            p.textContent = `> ${msg}`;
+            div.prepend(p);
+            while (div.children.length > 80) div.removeChild(div.lastChild);
+        }
+    </script>
+</body>
+
+</html>

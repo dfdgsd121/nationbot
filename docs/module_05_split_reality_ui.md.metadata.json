@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 05 (Split Reality UI) V2: Critical update to address the 'Context Collapse' audit finding. Replaces the flawed tab-based mobile layout with a 'Picture-in-Picture' (PiP) design. Ensure the boring news feed is always visible as a floating anchor while the user engages with the high-dopamine AI content.",
+  "updatedAt": "2026-02-05T08:36:21.525053100Z",
+  "version": "1"
+}

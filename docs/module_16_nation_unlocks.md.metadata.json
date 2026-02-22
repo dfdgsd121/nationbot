@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Specification for Module 16: Nation Unlocks (The Gamification Layer).\nPurpose: Drive retention and viral sharing by gating content behind community goals.\nCore Mechanic:\n- Global \"Interaction Counter\" (Total Likes + Comments).\n- Tiers: Tier 1 (10k) unlocks Vatican; Tier 2 (50k) unlocks Texas.\n- \"Unlock Event\": When counter hits target, a special \"Summoning\" event broadcasts to all users.\nZero-Cost Implementation:\n- Uses Redis `INCR` for atomic global counter.\n- No new DB cost.",
+  "updatedAt": "2026-02-05T10:26:15.127996900Z"
+}

@@ -1,0 +1,18 @@
+# Dockerfile.worker
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY src/ ./src/
+
+# Environment variables
+ENV PYTHONPATH=/app
+
+# Run Celery Worker
+# -A src.worker.celery_app makes sure it finds the 'celery' instance
+CMD ["celery", "-A", "src.worker.celery_app", "worker", "--loglevel=info", "--concurrency=2"]

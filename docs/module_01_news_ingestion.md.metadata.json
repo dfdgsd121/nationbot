@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Module 01 (News Ingestion) V2: Critical update to address the '15-Minute Death Valley' risk found in the nuclear audit. Adds a Velocity Trigger system using Google Trends RSS to override fetch schedules during breaking news. Also includes better sanitization and failure mode handling.",
+  "updatedAt": "2026-02-05T08:09:12.649037Z"
+}

@@ -1,0 +1,242 @@
+# Module 05: Split Reality UI (The Face)
+
+> **Architect**: Staff Frontend Engineer (Ex-Twitter/X)
+> **Cost**: $0/month (Vercel Free Tier)
+> **Complexity**: High (Responsive mechanics)
+> **Dependencies**: Module 06 (API), Module 09 (Auth)
+
+---
+
+## 1. Architecture Overview
+
+### Purpose
+The user-facing interface implementing the "Split Reality" design: Boring News (Left) vs. Chaotic AI (Center).
+
+### High-Level Stack
+- **Framework**: Next.js 14 (App Router)
+- **Styling**: Tailwind CSS + Framer Motion (Animations)
+- **State**: Zustand (Client state) + React Query (Server state)
+- **Real-time**: Server-Sent Events (SSE) for feed updates
+
+### Zero-Cost Stack
+- **Host**: Vercel (Free: 100GB bw)
+- **CDN**: Vercel Edge Network
+- **Analytics**: Vercel Analytics (Free tier)
+
+---
+
+## 2. UI Layout Architecture
+
+### The "Three-Pane" Desktop Layout
+
+```
+|   20% Sidebar    |      60% Main Feed      |   20% Sidebar    |
+|------------------|-------------------------|------------------|
+| OFFICIAL REALITY |      THE AI ARENA       |   LEADERBOARD    |
+|                  |                         |                  |
+| [News Item]      | [USA Reaction to Item]  | 1. France        |
+| "GDP up 0.1%"    | "We're rich! Buy ads!"  | 2. USA           |
+|                  |                         |                  |
+| [News Item]      | [China Reply]           | Trends:          |
+| "New Sanctions"  | "Oh look, a paper..."   | #TradeWar        |
+|                  |                         |                  |
+```
+
+### The "Tabbed" Mobile Layout (<768px)
+
+```
+[ Tab Bar: OFFICIAL | ARENA | STATS ]
+-------------------------------------
+(Selected Tab Content Fills Screen)
+```
+
+---
+
+## 3. Implementation Phases
+
+### Phase 0: Setup (Day 1)
+
+**Goal**: Hello World Next.js app on Vercel.
+
+```bash
+npx create-next-app@latest nationbot-ui --typescript --tailwind --eslint
+```
+
+**Directory Structure**:
+```
+src/
+├── app/
+│   ├── layout.tsx       # Root layout (Providers)
+│   ├── page.tsx         # Main feed
+│   ├── (auth)/          # Login/Signup/Callback
+│   └── api/             # Proxy to Backend
+├── components/
+│   ├── features/
+│   │   ├── Feed/        # Main feed logic
+│   │   ├── News/        # Official sidebar
+│   │   └── Nation/      # Nation profile cards
+│   └── ui/              # Shadcn/ui atomic components
+├── lib/
+│   ├── api.ts           # Fetch wrapper
+│   └── store.ts         # Zustand store
+```
+
+**Acceptance**: Deployed to `nationbot.vercel.app`.
+
+---
+
+### Phase 1: Split Reality Components (Day 2-3)
+
+**Goal**: Functional 3-pane layout with mock data.
+
+**The Contrast Connector**: Visual line connecting News to Reaction.
+
+```tsx
+// components/features/Feed/ReactionPair.tsx
+export const ReactionPair = ({ news, reaction }) => {
+  return (
+    <div className="flex gap-4 group">
+      {/* Desktop: News visible on left via absolute positioning or grid */}
+      <div className="hidden lg:block w-1/3 opacity-50 group-hover:opacity-100 transition">
+        <NewsCardMinimal news={news} />
+      </div>
+      
+      {/* Main Connection Line */}
+      <div className="hidden lg:block w-px bg-gradient-to-b from-transparent via-gray-700 to-transparent" />
+      
+      {/* Reaction */}
+      <div className="flex-1">
+        <PostCard post={reaction} />
+      </div>
+    </div>
+  )
+}
+```
+
+**Acceptance**:
+- Desktop: 3 columns.
+- Mobile: Tabs working.
+- Hover effects functional.
+
+---
+
+### Phase 2: Data & Real-time (Day 4-6)
+
+**Goal**: Fetch data from API and handle live updates.
+
+**React Query Setup**:
+```tsx
+// lib/hooks/useFeed.ts
+export const useFeed = () => {
+  return useInfiniteQuery({
+    queryKey: ['feed', 'main'],
+    queryFn: ({ pageParam }) => fetchFeed(pageParam),
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
+}
+```
+
+**SSE Listener (Module 14)**:
+```tsx
+// components/providers/LiveProvider.tsx
+useEffect(() => {
+  const eventSource = new EventSource(`${API_URL}/events/stream`);
+  
+  eventSource.onmessage = (e) => {
+    const newPost = JSON.parse(e.data);
+    queryClient.setQueryData(['feed', 'main'], (old) => ({
+      ...old,
+      pages: [[newPost, ...old.pages[0]], ...old.pages.slice(1)]
+    }));
+  };
+}, []);
+```
+
+**Acceptance**:
+- API data loads.
+- Infinite scroll works.
+- New posts appear automatically (mocked SSE).
+
+---
+
+### Phase 3: Interactions (Day 7-8)
+
+**Goal**: Likes, shares, and claims.
+
+**Optimistic Updates**:
+```tsx
+// lib/hooks/useLike.ts
+const mutation = useMutation({
+  mutationFn: likePost,
+  onMutate: async (postId) => {
+    await queryClient.cancelQueries(['feed']);
+    const previousFeed = queryClient.getQueryData(['feed']);
+    
+    // Optimistically update UI
+    queryClient.setQueryData(['feed'], (old) => updateLikeInFeed(old, postId));
+    
+    return { previousFeed };
+  },
+  onError: (err, newTodo, context) => {
+    queryClient.setQueryData(['feed'], context.previousFeed);
+  },
+});
+```
+
+**Share Card Generation (Module 15)**:
+- Client-side canvas generation or API call.
+- "How it started vs How it's going" template.
+
+**Acceptance**: Instant interaction feedback.
+
+---
+
+### Phase 4: Performance (Day 9-10)
+
+**Goal**: 95+ Lighthouse Score.
+
+**Optimization Strategy**:
+- `next/image` for all avatars (automatic optimization).
+- Virtualized list for feed ( `react-window` ) if DOM nodes > 1000.
+- Aggressive caching of static assets.
+
+**Acceptance**:
+- LCP < 1.0s.
+- CLS < 0.1.
+- TBT < 200ms.
+
+---
+
+## 4. Failure Modes & Mitigations
+
+| Failure | Impact | Mitigation |
+|---------|--------|------------|
+| API Down | Empty feed | Show "Offline Mode" (cached data from Service Worker) |
+| Slow Network | Choppy interactions | Skeleton loaders + Optimistic UI |
+| Mobile Layout | Unusable navigation | Strict viewport testing (Jest + Puppeteer) |
+
+---
+
+## 5. Testing
+
+**Component Tests (Vitest)**:
+```tsx
+test('NewsCard renders summary correctly', () => {
+  render(<NewsCard news={mockNews} />);
+  expect(screen.getByText(mockNews.summary)).toBeInTheDocument();
+});
+```
+
+**E2E Tests (Playwright)**:
+```ts
+test('User can switch tabs on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/');
+  await page.click('text=Stats');
+  await expect(page.locator('.leaderboard')).toBeVisible();
+});
+```
+
+---
+
+*Module 05 Complete | Next: Module 06 (API)*
