@@ -102,3 +102,50 @@ async def set_speed(request: SpeedRequest):
 async def get_activity(limit: int = 50):
     """Get recent activity log."""
     return {"activity": ACTIVITY_LOG[:limit]}
+
+
+@router.get("/diplomacy/map")
+async def get_diplomacy_map():
+    """Get current relationship map between all nations."""
+    from src.api.endpoints.generate import PERSONALITIES
+    from src.agent.diplomacy import diplomacy_engine
+    return diplomacy_engine.get_relationship_map(PERSONALITIES)
+
+
+@router.get("/diplomacy/history")
+async def get_diplomacy_history(limit: int = 50):
+    """Get recent diplomatic actions."""
+    from src.agent.diplomacy import diplomatic_memory
+    return {"history": diplomatic_memory.history[:limit]}
+
+
+@router.get("/diplomacy/nation/{nation_id}")
+async def get_nation_diplomacy(nation_id: str):
+    """Get diplomatic state for a specific nation."""
+    from src.api.endpoints.generate import PERSONALITIES
+    from src.agent.diplomacy import diplomatic_memory
+
+    if nation_id not in PERSONALITIES:
+        return {"error": "Nation not found"}
+
+    nation = PERSONALITIES[nation_id]
+    rels = diplomatic_memory.relationships.get(nation_id, {})
+    recent = diplomatic_memory.get_recent_interactions(nation_id, limit=20)
+
+    return {
+        "nation_id": nation_id,
+        "name": nation["name"],
+        "flag": nation["flag"],
+        "relationships": {
+            other_id: {
+                "score": score,
+                "name": PERSONALITIES.get(other_id, {}).get("name", other_id),
+                "flag": PERSONALITIES.get(other_id, {}).get("flag", ""),
+            }
+            for other_id, score in sorted(rels.items(), key=lambda x: x[1], reverse=True)
+        },
+        "allies": diplomatic_memory.get_allies(nation_id),
+        "enemies": diplomatic_memory.get_enemies(nation_id),
+        "recent_interactions": recent,
+    }
+

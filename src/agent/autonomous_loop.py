@@ -76,6 +76,7 @@ class AutonomousLoop:
             "replies_generated": 0,
             "boredom_triggers": 0,
             "news_reactions": 0,
+            "diplomatic_actions": 0,
             "ticks": 0,
             "errors": 0,
         }
@@ -142,6 +143,7 @@ class AutonomousLoop:
         last_fast = time.time()
         last_medium = time.time() - self.medium_interval + 30  # First medium tick after 30s
         last_slow = time.time()
+        last_diplomacy = time.time() - 250  # First diplomacy tick after ~50s
 
         # Give server a moment to boot
         await asyncio.sleep(5)
@@ -168,6 +170,12 @@ class AutonomousLoop:
                     last_medium = now
                     await self._tick_medium_posts(PERSONALITIES, GrammarEngine,
                                                    create_post, broadcast_post)
+
+                # ── DIPLOMACY TICK: Inter-agent coordination (every 5 min) ──
+                if now - last_diplomacy >= 300:
+                    last_diplomacy = now
+                    await self._tick_diplomacy(PERSONALITIES, GrammarEngine,
+                                               create_post, broadcast_post)
 
                 # ── SLOW TICK: Boredom self-expression ────────────────
                 if now - last_slow >= self.slow_interval:
@@ -312,6 +320,52 @@ class AutonomousLoop:
                          f"{nation['flag']} {nation['name']} is rambling about {topic}")
 
             await asyncio.sleep(random.uniform(8, 20))
+
+    async def _tick_diplomacy(self, PERSONALITIES, GrammarEngine,
+                               create_post, broadcast_post):
+        """Inter-agent diplomatic coordination — alliances, threats, deals."""
+        from src.agent.diplomacy import diplomacy_engine
+
+        topics = [
+            "trade sanctions", "military alliance", "territorial claim",
+            "intelligence sharing", "climate pact", "tech embargo",
+            "refugee policy", "nuclear deal", "cyber warfare pact",
+            "resource extraction rights", "space cooperation",
+        ]
+        topic = random.choice(topics)
+
+        # Run a diplomatic round
+        actions = diplomacy_engine.trigger_diplomatic_round(PERSONALITIES, topic)
+
+        for action in actions[:4]:  # Cap at 4 diplomatic events per tick
+            # Generate a post from the diplomatic action
+            nation_id = action["nation_a"]
+            nation = PERSONALITIES[nation_id]
+
+            # Use the diplomatic message as the post content
+            post = create_post(
+                nation_id=nation_id,
+                content=action["message"][:280],
+                generation_meta={
+                    "source": "diplomacy",
+                    "action_type": action["type"],
+                    "target_nation": action["nation_b"],
+                    "relationship_delta": action["relationship_delta"],
+                }
+            )
+            await broadcast_post(post)
+            self.stats["diplomatic_actions"] += 1
+
+            # Log to activity feed
+            target_nation = PERSONALITIES.get(action["nation_b"], {})
+            log_activity(
+                "diplomacy", nation_id,
+                f"{nation['flag']} {nation['name']} -> {target_nation.get('flag', '')} "
+                f"{target_nation.get('name', action['nation_b'])}: {action['type']}",
+                {"action_type": action["type"], "relationship": action["new_relationship"]}
+            )
+
+            await asyncio.sleep(random.uniform(3, 8))
 
     # ------------------------------------------------------------------
     # Manual Injection (Admin / Human Handoff)
