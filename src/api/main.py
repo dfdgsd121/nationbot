@@ -137,6 +137,8 @@ _load_router("admin", "/v1/admin", ["Admin"])
 async def on_startup():
     """Start the autonomous nation loop when the server boots."""
     try:
+        from src.agent.db import init_db
+        init_db()
         from src.agent.autonomous_loop import autonomous_loop
         autonomous_loop.start()
         logger.info("🚀 Autonomous loop auto-started")

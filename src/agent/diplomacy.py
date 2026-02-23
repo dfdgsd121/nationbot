@@ -15,7 +15,13 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-logger = logging.getLogger("agent.diplomacy")
+from .db import (
+    init_db,
+    get_all_relationships,
+    update_relationship_db,
+    get_history,
+    add_history_entry
+)
 
 
 # ============================================================================
@@ -24,34 +30,42 @@ logger = logging.getLogger("agent.diplomacy")
 class DiplomaticMemory:
     """
     Tracks inter-nation relationships, past interactions, and grudges.
-    In-memory for now — can be persisted to DB later.
+    Backed by SQLite for persistence across backend restarts.
     """
 
     def __init__(self):
-        # relationship_score[nation_a][nation_b] = float (-100 to +100)
-        self.relationships: dict[str, dict[str, float]] = {}
-        # Recent diplomatic actions
-        self.history: list[dict] = []
+        # We don't load everything into memory anymore, we rely on DB calls
+        # to ensure distributed components (or restarts) see the latest data.
         self.max_history = 500
+
+    @property
+    def relationships(self) -> dict:
+        """Helper to get all relationships from DB."""
+        return get_all_relationships()
+
+    @property
+    def history(self) -> list:
+        """Helper to get history from DB."""
+        return get_history(self.max_history)
 
     def get_relationship(self, nation_a: str, nation_b: str) -> float:
         """Get relationship score between two nations (-100 to +100)."""
-        return self.relationships.get(nation_a, {}).get(nation_b, 0.0)
+        rels = get_all_relationships()
+        return rels.get(nation_a, {}).get(nation_b, 0.0)
 
     def update_relationship(self, nation_a: str, nation_b: str, delta: float, reason: str):
-        """Adjust relationship score bidirectionally."""
-        if nation_a not in self.relationships:
-            self.relationships[nation_a] = {}
-        if nation_b not in self.relationships:
-            self.relationships[nation_b] = {}
-
+        """Adjust relationship score bidirectionally and persist."""
+        rels = get_all_relationships()
+        
         # Update A->B
-        current_ab = self.relationships[nation_a].get(nation_b, 0.0)
-        self.relationships[nation_a][nation_b] = max(-100, min(100, current_ab + delta))
+        current_ab = rels.get(nation_a, {}).get(nation_b, 0.0)
+        new_ab = max(-100, min(100, current_ab + delta))
+        update_relationship_db(nation_a, nation_b, new_ab)
 
-        # Update B->A (slightly less)
-        current_ba = self.relationships[nation_b].get(nation_a, 0.0)
-        self.relationships[nation_b][nation_a] = max(-100, min(100, current_ba + delta * 0.7))
+        # Update B->A (slightly less impact)
+        current_ba = rels.get(nation_b, {}).get(nation_a, 0.0)
+        new_ba = max(-100, min(100, current_ba + delta * 0.7))
+        update_relationship_db(nation_b, nation_a, new_ba)
 
         self._record("relationship_change", nation_a, nation_b, delta, reason)
 
@@ -61,33 +75,25 @@ class DiplomaticMemory:
 
     def get_allies(self, nation_id: str, min_score: float = 20.0) -> list[str]:
         """Get nations with positive relationship scores."""
-        rels = self.relationships.get(nation_id, {})
-        return [nid for nid, score in rels.items() if score >= min_score]
+        rels = get_all_relationships()
+        return [nid for nid, score in rels.get(nation_id, {}).items() if score >= min_score]
 
     def get_enemies(self, nation_id: str, max_score: float = -20.0) -> list[str]:
         """Get nations with negative relationship scores."""
-        rels = self.relationships.get(nation_id, {})
-        return [nid for nid, score in rels.items() if score <= max_score]
+        rels = get_all_relationships()
+        return [nid for nid, score in rels.get(nation_id, {}).items() if score <= max_score]
 
     def get_recent_interactions(self, nation_id: str, limit: int = 10) -> list[dict]:
         """Get recent interactions involving a nation."""
+        hist = get_history(self.max_history)
         return [
-            h for h in self.history
+            h for h in hist
             if h["nation_a"] == nation_id or h["nation_b"] == nation_id
         ][:limit]
 
     def _record(self, event_type, nation_a, nation_b, delta, detail):
-        entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "event_type": event_type,
-            "nation_a": nation_a,
-            "nation_b": nation_b,
-            "delta": delta,
-            "detail": detail,
-        }
-        self.history.insert(0, entry)
-        if len(self.history) > self.max_history:
-            self.history.pop()
+        """Save history entry to DB."""
+        add_history_entry(event_type, nation_a, nation_b, delta, detail)
 
 
 # ============================================================================
