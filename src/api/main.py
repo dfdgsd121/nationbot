@@ -127,3 +127,29 @@ _load_router("stream", "/v1/stream", ["Stream"])
 _load_router("intercepts", "/v1/intercepts", ["Intercepts"])
 _load_router("actions", "/v1/actions", ["Actions"])
 _load_router("auth_endpoints", "/v1/auth", ["Auth"])
+_load_router("admin", "/v1/admin", ["Admin"])
+
+
+# ============================================================================
+# LIFECYCLE: Auto-start the autonomous loop
+# ============================================================================
+@app.on_event("startup")
+async def on_startup():
+    """Start the autonomous nation loop when the server boots."""
+    try:
+        from src.agent.autonomous_loop import autonomous_loop
+        autonomous_loop.start()
+        logger.info("🚀 Autonomous loop auto-started")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not auto-start autonomous loop: {e}")
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Gracefully stop the loop."""
+    try:
+        from src.agent.autonomous_loop import autonomous_loop
+        autonomous_loop.stop()
+    except Exception:
+        pass
+

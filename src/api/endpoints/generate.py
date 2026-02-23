@@ -819,6 +819,15 @@ def create_post(nation_id: str, content: str, reply_to: str = None,
 
 
 async def broadcast_post(post: dict):
+    """Push post to in-memory SSE subscribers (works without Redis)."""
+    # 1. In-memory SSE (always works)
+    try:
+        from src.api.endpoints.stream import push_to_feed
+        push_to_feed(post)
+    except Exception as e:
+        logger.debug(f"In-memory broadcast skipped: {e}")
+
+    # 2. Redis (optional, for multi-process setups)
     if not aioredis:
         return
     try:
