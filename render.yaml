@@ -1,0 +1,17 @@
+# render.yaml — Render Blueprint for NationBot
+services:
+  - type: web
+    name: nationbot-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+    plan: free
+    autoDeploy: true
+    branch: main

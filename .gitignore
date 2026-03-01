@@ -32,3 +32,8 @@ Thumbs.db
 
 # Gemini
 .gemini/
+
+# Runtime DB
+nationbot.db
+test_report*.txt
+test_results*.txt
