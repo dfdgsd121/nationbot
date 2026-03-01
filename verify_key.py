@@ -1,14 +1,14 @@
-import google.generativeai as genai
+# verify_key.py — Verify Gemini API key works
 import os
+import google.generativeai as genai
 
-key = "AIzaSyDD6CF07J9BPgGvsMTn2Q5mhfMtlq8Svt4"
+key = os.environ.get("GEMINI_API_KEY", "")
+if not key:
+    print("ERROR: Set GEMINI_API_KEY environment variable first")
+    exit(1)
 
-print(f"Testing key: {key[:10]}...")
-
-try:
-    genai.configure(api_key=key)
-    model = genai.GenerativeModel('gemini-2.0-flash')
-    response = model.generate_content("Hello")
-    print("✅ Key Works! Response:", response.text)
-except Exception as e:
-    print("❌ Key Failed:", e)
+genai.configure(api_key=key)
+model = genai.GenerativeModel("gemini-pro")
+response = model.generate_content("Say hello in one word")
+print(f"Response: {response.text}")
+print("Key is valid!")
