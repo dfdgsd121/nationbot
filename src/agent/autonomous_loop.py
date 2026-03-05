@@ -137,7 +137,7 @@ class AutonomousLoop:
         # Lazy import to avoid circular deps
         from src.api.endpoints.generate import (
             PERSONALITIES, GrammarEngine, create_post, broadcast_post,
-            pick_replying_nation, POSTS_STORE
+            pick_replying_nation, POSTS_STORE, generate_with_gemini
         )
 
         last_fast = time.time()
@@ -215,12 +215,18 @@ class AutonomousLoop:
             replier_id = pick_replying_nation(target_post["nation_id"])
             nation = PERSONALITIES[replier_id]
 
-            # Generate reply content
-            content = GrammarEngine.generate(
+            # Generate reply content — try Gemini first
+            content = await generate_with_gemini(
                 replier_id,
-                target_post.get("content", "geopolitics")[:50],
+                target_post.get("content", "geopolitics")[:100],
                 reply_to_nation=target_post["nation_id"]
             )
+            if not content:
+                content = GrammarEngine.generate(
+                    replier_id,
+                    target_post.get("content", "geopolitics")[:50],
+                    reply_to_nation=target_post["nation_id"]
+                )
 
             post = create_post(
                 nation_id=replier_id,
@@ -258,7 +264,9 @@ class AutonomousLoop:
             nation = PERSONALITIES[nation_id]
             topic = random.choice(topics)
 
-            content = GrammarEngine.generate(nation_id, topic)
+            content = await generate_with_gemini(nation_id, topic)
+            if not content:
+                content = GrammarEngine.generate(nation_id, topic)
             post = create_post(
                 nation_id=nation_id,
                 content=content,
@@ -307,7 +315,9 @@ class AutonomousLoop:
             nation = PERSONALITIES[nation_id]
             topic = random.choice(boredom_topics)
 
-            content = GrammarEngine.generate(nation_id, topic)
+            content = await generate_with_gemini(nation_id, topic)
+            if not content:
+                content = GrammarEngine.generate(nation_id, topic)
             post = create_post(
                 nation_id=nation_id,
                 content=content,
@@ -385,7 +395,9 @@ class AutonomousLoop:
         posts = []
         for nation_id in reactors:
             nation = PERSONALITIES[nation_id]
-            content = GrammarEngine.generate(nation_id, headline, is_news=True)
+            content = await generate_with_gemini(nation_id, headline, is_news=True)
+            if not content:
+                content = GrammarEngine.generate(nation_id, headline, is_news=True)
             post = create_post(
                 nation_id=nation_id,
                 content=content,
@@ -408,10 +420,15 @@ class AutonomousLoop:
             for _ in range(random.randint(2, 3)):
                 target = random.choice(posts)
                 replier = pick_replying_nation(target["nation_id"])
-                content = GrammarEngine.generate(
-                    replier, headline[:50],
+                content = await generate_with_gemini(
+                    replier, headline[:100],
                     reply_to_nation=target["nation_id"]
                 )
+                if not content:
+                    content = GrammarEngine.generate(
+                        replier, headline[:50],
+                        reply_to_nation=target["nation_id"]
+                    )
                 reply = create_post(
                     nation_id=replier,
                     content=content,

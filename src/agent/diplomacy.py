@@ -15,6 +15,9 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
+logger = logging.getLogger("agent.diplomacy")
+
+
 from .db import (
     init_db,
     get_all_relationships,
@@ -269,6 +272,53 @@ class DiplomacyEngine:
             return "hostile"
 
 
+# ============================================================================
+# SEED INITIAL RELATIONSHIPS — Realistic starting geopolitics
+# ============================================================================
+INITIAL_RELATIONSHIPS = [
+    # Strong alliances
+    ("US", "UK", 65), ("US", "CA", 70), ("US", "AU", 60), ("US", "JP", 55),
+    ("US", "KR", 50), ("US", "IL", 60), ("UK", "AU", 55), ("UK", "CA", 50),
+    ("FR", "DE", 45), ("FR", "IT", 40), ("DE", "PL", 35), ("CN", "RU", 50),
+    ("CN", "KP", 55), ("RU", "IR", 40), ("SA", "EG", 35), ("IN", "JP", 35),
+    ("AU", "JP", 40), ("PL", "UA", 55), ("US", "PL", 40), ("US", "UA", 45),
+
+    # Strong rivalries
+    ("US", "RU", -55), ("US", "CN", -40), ("US", "IR", -60), ("US", "KP", -70),
+    ("RU", "UA", -75), ("RU", "PL", -45), ("RU", "UK", -50),
+    ("CN", "JP", -35), ("CN", "IN", -30), ("CN", "KR", -25),
+    ("IL", "IR", -70), ("SA", "IR", -60), ("IN", "PK", -55),
+    ("KP", "KR", -65), ("KP", "JP", -60),
+    ("UK", "AR", -25), ("JP", "KR", -15),
+
+    # Moderate
+    ("TR", "RU", -15), ("BR", "IN", 25), ("MX", "BR", 20),
+    ("ID", "AU", 25), ("EG", "IL", -20),
+]
+
+
+def seed_initial_relationships():
+    """Seed realistic starting relationships if DB is empty."""
+    rels = get_all_relationships()
+    if rels:
+        # Already has data — don't overwrite
+        return
+
+    logger.info("Seeding initial diplomatic relationships...")
+    for nation_a, nation_b, score in INITIAL_RELATIONSHIPS:
+        update_relationship_db(nation_a, nation_b, float(score))
+        update_relationship_db(nation_b, nation_a, float(score * 0.85))  # Slight asymmetry
+        reason = "alliance" if score > 0 else "rivalry"
+        add_history_entry("seed", nation_a, nation_b, score, f"Initial {reason}")
+    logger.info(f"Seeded {len(INITIAL_RELATIONSHIPS)} diplomatic relationships")
+
+
 # Singletons
 diplomatic_memory = DiplomaticMemory()
 diplomacy_engine = DiplomacyEngine(diplomatic_memory)
+
+# Seed on import (runs once at startup)
+try:
+    seed_initial_relationships()
+except Exception as e:
+    logger.warning(f"Could not seed relationships: {e}")

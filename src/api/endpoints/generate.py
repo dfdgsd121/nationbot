@@ -707,16 +707,114 @@ class GrammarEngine:
 
 
 # ============================================================================
-# GEMINI (disabled by default)
+# GEMINI AI — Smart Content Generation
 # ============================================================================
 GEMINI_AVAILABLE = False
+_gemini_model = None
+_gemini_calls_this_minute = 0
+_gemini_minute_start = 0
+
 try:
     import google.generativeai as genai
     _key = os.getenv("GEMINI_API_KEY", "")
     if _key:
         genai.configure(api_key=_key)
-except Exception:
-    pass
+        _gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+        GEMINI_AVAILABLE = True
+        logger.info("Gemini AI ENABLED for content generation")
+except Exception as e:
+    logger.warning(f"Gemini not available: {e}")
+
+
+async def generate_with_gemini(nation_id: str, topic: str,
+                                reply_to_nation: str = None,
+                                is_news: bool = False) -> Optional[str]:
+    """Generate a post using Gemini AI. Returns None on failure."""
+    global _gemini_calls_this_minute, _gemini_minute_start
+
+    if not GEMINI_AVAILABLE or not _gemini_model:
+        return None
+
+    # Rate limit: max 10 calls per minute
+    now = time.time()
+    if now - _gemini_minute_start > 60:
+        _gemini_calls_this_minute = 0
+        _gemini_minute_start = now
+    if _gemini_calls_this_minute >= 10:
+        return None
+    _gemini_calls_this_minute += 1
+
+    nation = PERSONALITIES.get(nation_id, {})
+    name = nation.get("name", nation_id)
+    rivals = [PERSONALITIES[r]["name"] for r in nation.get("rivals", []) if r in PERSONALITIES]
+    allies = [PERSONALITIES[a]["name"] for a in nation.get("allies", []) if a in PERSONALITIES]
+
+    # Build a personality-aware prompt
+    context_parts = [
+        f"You are {name}, a nation posting on a geopolitical social media platform.",
+        f"Your rivals: {', '.join(rivals) if rivals else 'none'}.",
+        f"Your allies: {', '.join(allies) if allies else 'none'}.",
+    ]
+
+    if reply_to_nation and reply_to_nation in PERSONALITIES:
+        target = PERSONALITIES[reply_to_nation]["name"]
+        is_rival = reply_to_nation in nation.get("rivals", [])
+        tone = "confrontational and sharp" if is_rival else "diplomatic but firm"
+        context_parts.append(f"You are replying to {target}. Be {tone}.")
+
+    if is_news:
+        context_parts.append(f"React to this breaking news: '{topic}'")
+    else:
+        context_parts.append(f"Post about: {topic}")
+
+    prompt = "\n".join(context_parts) + """
+
+Rules:
+- Write 1-2 sentences MAX (under 250 chars), like a tweet
+- Be specific, opinionated, provocative. NO generic platitudes
+- Reference real current events, geopolitics, trade, tech, military
+- Show YOUR nation's unique perspective and self-interest
+- Use 1 emoji max
+- Do NOT use hashtags, do NOT use quotes. Just speak directly
+- Sound like a sharp political commentator, not a press release"""
+
+    try:
+        response = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: _gemini_model.generate_content(prompt)
+        )
+        text = response.text.strip().strip('"').strip("'")
+        if text and len(text) > 20:
+            return text[:280]
+    except Exception as e:
+        logger.debug(f"Gemini generation failed for {nation_id}: {e}")
+
+    return None
+
+
+def generate_content(nation_id: str, topic: str = None,
+                     reply_to_nation: str = None, is_news: bool = False) -> str:
+    """Synchronous wrapper — tries Gemini, falls back to templates."""
+    # Try Gemini via async
+    if GEMINI_AVAILABLE:
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(
+                        asyncio.run,
+                        generate_with_gemini(nation_id, topic or "current events",
+                                             reply_to_nation, is_news)
+                    )
+                    result = future.result(timeout=15)
+                    if result:
+                        return result
+        except Exception:
+            pass
+
+    # Fallback to template engine
+    return GrammarEngine.generate(nation_id, topic, reply_to_nation, is_news)
+
 
 # ============================================================================
 # REDIS
