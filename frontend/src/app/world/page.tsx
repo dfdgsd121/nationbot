@@ -53,18 +53,19 @@ export default function WorldPage() {
         return () => clearInterval(id);
     }, []);
 
-    // Build relationships from diplomacy map
+    // Build relationships from diplomacy map — API format: relationships dict with scores
     const relationships = useMemo(() => {
         if (!diplomacyMap) return [];
         const rels: Relationship[] = [];
         const seen = new Set<string>();
 
         Object.entries(diplomacyMap).forEach(([nid, data]: [string, any]) => {
-            [...(data.allies || []), ...(data.enemies || [])].forEach((rel: any) => {
-                const key = [nid, rel.id].sort().join("-");
+            const nationRels = data.relationships || {};
+            Object.entries(nationRels).forEach(([otherId, info]: [string, any]) => {
+                const key = [nid, otherId].sort().join("-");
                 if (!seen.has(key)) {
                     seen.add(key);
-                    rels.push({ from: nid, to: rel.id, score: rel.score });
+                    rels.push({ from: nid, to: otherId, score: info.score || 0 });
                 }
             });
         });
@@ -72,6 +73,26 @@ export default function WorldPage() {
     }, [diplomacyMap]);
 
     const selectedData = selectedNation && diplomacyMap ? diplomacyMap[selectedNation] : null;
+
+    // Transform selected nation's allies/enemies for the detail panel
+    const selectedAllies = useMemo(() => {
+        if (!selectedData) return [];
+        const rels = selectedData.relationships || {};
+        return (selectedData.allies || []).map((id: string) => ({
+            id,
+            score: rels[id]?.score || 0,
+        }));
+    }, [selectedData]);
+
+    const selectedEnemies = useMemo(() => {
+        if (!selectedData) return [];
+        const rels = selectedData.relationships || {};
+        return (selectedData.enemies || []).map((id: string) => ({
+            id,
+            score: rels[id]?.score || 0,
+        }));
+    }, [selectedData]);
+
 
     return (
         <div className="h-[calc(100vh-3.5rem)] flex flex-col overflow-hidden">
@@ -224,9 +245,9 @@ export default function WorldPage() {
                         {/* Allies */}
                         <div className="p-4 border-b border-white/[0.04]">
                             <div className="text-[10px] font-semibold text-emerald-400/60 uppercase tracking-wider mb-2">
-                                Allies ({(selectedData.allies || []).length})
+                                Allies ({selectedAllies.length})
                             </div>
-                            {(selectedData.allies || []).map((a: any) => (
+                            {selectedAllies.map((a: any) => (
                                 <div
                                     key={a.id}
                                     onClick={() => setSelectedNation(a.id)}
@@ -242,9 +263,9 @@ export default function WorldPage() {
                         {/* Enemies */}
                         <div className="p-4">
                             <div className="text-[10px] font-semibold text-red-400/60 uppercase tracking-wider mb-2">
-                                Rivals ({(selectedData.enemies || []).length})
+                                Rivals ({selectedEnemies.length})
                             </div>
-                            {(selectedData.enemies || []).map((e: any) => (
+                            {selectedEnemies.map((e: any) => (
                                 <div
                                     key={e.id}
                                     onClick={() => setSelectedNation(e.id)}

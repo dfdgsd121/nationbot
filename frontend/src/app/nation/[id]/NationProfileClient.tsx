@@ -68,8 +68,16 @@ export default function NationProfileClient({ id }: { id: string }) {
         );
     }
 
-    const allies = diplomacy?.allies || [];
-    const enemies = diplomacy?.enemies || [];
+    // Transform API data: allies/enemies are string arrays, relationships has scores
+    const rels = diplomacy?.relationships || {};
+    const allies = (diplomacy?.allies || []).map((id: string) => ({
+        id,
+        score: rels[id]?.score || 0,
+    }));
+    const enemies = (diplomacy?.enemies || []).map((id: string) => ({
+        id,
+        score: rels[id]?.score || 0,
+    }));
 
     return (
         <div className="h-[calc(100vh-3.5rem)] flex flex-col overflow-hidden">
