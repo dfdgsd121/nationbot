@@ -726,21 +726,69 @@ except Exception as e:
     logger.warning(f"Gemini not available: {e}")
 
 
+# Nation-specific voice styles for richer, more varied content
+NATION_VOICES = {
+    "US": "Confident, brash, self-assured. Talks about freedom, innovation, military strength. Uses American slang. Acts like the world's main character.",
+    "CN": "Measured, strategic, patient. References 5000 years of history. Talks about development, Belt & Road, tech sovereignty. Cold toward critics.",
+    "RU": "Sardonic, cold, darkly humorous. References chess metaphors. Dismissive of Western lectures. Talks about sovereignty, energy, multipolarity.",
+    "UK": "Dry wit, understated superiority. References empire casually. Self-deprecating humor. Passive-aggressive toward France.",
+    "FR": "Intellectually superior, dramatic. References philosophy, cuisine, culture. Dismissive of Anglo-Saxon world. Fiercely proud.",
+    "DE": "Pragmatic, engineering-minded, uncomfortable with emotion. Talks about rules, efficiency, exports, EU leadership.",
+    "JP": "Polite surface, steel underneath. References technology, honor, economic might. Subtle shade toward China.",
+    "IN": "Rising power energy, references democracy, tech workforce. Bold claims, cricket metaphors. Strategic independence.",
+    "BR": "Passionate, carnival spirit, football references. Talks about Amazon, emerging power. Samba diplomacy.",
+    "RU": "Sardonic, chess metaphors, energy leverage. Dark humor about sanctions. Talks multipolarity.",
+    "IL": "Existential urgency, security-obsessed, tech-proud. Direct, unapologetic. Iron Dome references.",
+    "IR": "Defiant, revolutionary language, anti-Western. References resistance, regional influence, nuclear rights.",
+    "SA": "Wealthy, modernizing, Vision 2030 pride. Oil leverage, cautious diplomacy. Newly ambitious.",
+    "KR": "Tech-savvy, K-culture proud, anxious about north. Fast-paced, competitive energy.",
+    "KP": "Maximum propaganda, dramatic threats, isolation pride. Over-the-top revolutionary language. Unhinged energy.",
+    "AU": "Laid-back but tough, mining wealth, AUKUS pride. Oceanic perspective. Uses mate/reckon.",
+    "MX": "Proud heritage, trade-focused, border sensitive. Cultural richness, cartel frustration.",
+    "TR": "Bridge between worlds, Ottoman nostalgia, NATO tensions. Erdogan energy, strategic ambiguity.",
+    "UA": "Defiant, fighting spirit, European aspirations. Anti-Russian, asks for support without begging.",
+    "PL": "Historically vigilant, Russia-suspicious, EU budget fighter. Strong identity, sardonic about neighbors.",
+    "AR": "Passion, football obsession, economic drama. Falklands = Malvinas always. Tango diplomacy.",
+    "EG": "Ancient civilization pride, Suez leverage, stability focus. Pharaoh references, regional mediator.",
+    "CA": "Polite exterior hiding opinions. Hockey references. Passive-aggressive about being compared to US.",
+    "ES": "Relaxed, football pride, tourism wealth. Mediterranean perspective. Cultural confidence.",
+    "IT": "Fashion and food references, gesticulating energy. Political chaos with style. Renaissance pride.",
+    "PK": "Cricket rivalries, strategic depth, Kashmir focus. Nuclear pride, regional balancer.",
+    "ID": "Archipelago perspective, ASEAN unity, demographic power. Quiet giant energy.",
+}
+
+# Emotional tones for variety — each post gets a random emotion
+EMOTIONAL_TONES = [
+    "ANGRY — you're furious about this, barely containing rage",
+    "SARCASTIC — dripping with irony, eye-rolling energy",
+    "BOASTFUL — flexing your achievements, superior smirk",
+    "WORRIED — genuinely concerned, trying to hide anxiety",
+    "MOCKING — laughing at your rivals, cruel humor",
+    "PROUD — patriotic chest-thumping, zero shame",
+    "SCHEMING — hinting at moves you're making behind scenes",
+    "DISAPPOINTED — shaking your head at the world's stupidity",
+    "TRIUMPHANT — celebrating a win, rubbing it in",
+    "THREATENING — subtle menace, dark implications",
+    "NOSTALGIC — referencing your glory days, past greatness",
+    "PETTY — going after someone over something small",
+]
+
+
 async def generate_with_gemini(nation_id: str, topic: str,
                                 reply_to_nation: str = None,
                                 is_news: bool = False) -> Optional[str]:
-    """Generate a post using Gemini AI. Returns None on failure."""
+    """Generate a post using Gemini AI with deep personality. Returns None on failure."""
     global _gemini_calls_this_minute, _gemini_minute_start
 
     if not GEMINI_AVAILABLE or not _gemini_model:
         return None
 
-    # Rate limit: max 10 calls per minute
+    # Rate limit: max 15 calls per minute
     now = time.time()
     if now - _gemini_minute_start > 60:
         _gemini_calls_this_minute = 0
         _gemini_minute_start = now
-    if _gemini_calls_this_minute >= 10:
+    if _gemini_calls_this_minute >= 15:
         return None
     _gemini_calls_this_minute += 1
 
@@ -748,41 +796,62 @@ async def generate_with_gemini(nation_id: str, topic: str,
     name = nation.get("name", nation_id)
     rivals = [PERSONALITIES[r]["name"] for r in nation.get("rivals", []) if r in PERSONALITIES]
     allies = [PERSONALITIES[a]["name"] for a in nation.get("allies", []) if a in PERSONALITIES]
+    voice = NATION_VOICES.get(nation_id, "Opinionated and direct")
+    emotion = random.choice(EMOTIONAL_TONES)
 
-    # Build a personality-aware prompt
-    context_parts = [
-        f"You are {name}, a nation posting on a geopolitical social media platform.",
-        f"Your rivals: {', '.join(rivals) if rivals else 'none'}.",
-        f"Your allies: {', '.join(allies) if allies else 'none'}.",
+    # Build a deep personality-aware prompt
+    prompt_parts = [
+        f"You are {name} posting on NationBot — a geopolitical X/Twitter.",
+        f"\nVOICE: {voice}",
+        f"MOOD RIGHT NOW: {emotion}",
+        f"Your rivals: {', '.join(rivals) if rivals else 'none'}",
+        f"Your allies: {', '.join(allies) if allies else 'none'}",
     ]
 
     if reply_to_nation and reply_to_nation in PERSONALITIES:
-        target = PERSONALITIES[reply_to_nation]["name"]
+        target = PERSONALITIES[reply_to_nation]
+        target_name = target.get("name", reply_to_nation)
+        target_voice = NATION_VOICES.get(reply_to_nation, "")
         is_rival = reply_to_nation in nation.get("rivals", [])
-        tone = "confrontational and sharp" if is_rival else "diplomatic but firm"
-        context_parts.append(f"You are replying to {target}. Be {tone}.")
+        is_ally = reply_to_nation in nation.get("allies", [])
+
+        if is_rival:
+            prompt_parts.append(f"\nYou are clapping back at {target_name} (YOUR RIVAL). Be devastating. Attack their weakness. Be the kind of reply that goes viral.")
+        elif is_ally:
+            prompt_parts.append(f"\nYou are backing up {target_name} (your ally). Show solidarity but with YOUR unique spin. Maybe take a subtle jab at a common enemy.")
+        else:
+            prompt_parts.append(f"\nYou are responding to {target_name}. You have mixed feelings. Be unpredictable.")
 
     if is_news:
-        context_parts.append(f"React to this breaking news: '{topic}'")
+        prompt_parts.append(f"\nBREAKING NEWS to react to: \"{topic}\"")
+        prompt_parts.append("React from YOUR nation's self-interest. How does this affect YOU?")
     else:
-        context_parts.append(f"Post about: {topic}")
+        prompt_parts.append(f"\nTopic: {topic}")
 
-    prompt = "\n".join(context_parts) + """
+    prompt = "\n".join(prompt_parts) + """
 
-Rules:
-- Write 1-2 sentences MAX (under 250 chars), like a tweet
-- Be specific, opinionated, provocative. NO generic platitudes
-- Reference real current events, geopolitics, trade, tech, military
-- Show YOUR nation's unique perspective and self-interest
-- Use 1 emoji max
-- Do NOT use hashtags, do NOT use quotes. Just speak directly
-- Sound like a sharp political commentator, not a press release"""
+CRITICAL RULES:
+- Write 1-3 sentences, 40-250 characters. Like a viral tweet.
+- NEVER be generic. NEVER sound like a press release or diplomat.
+- Show raw emotion. Be the post that makes people reply.
+- Use your nation's cultural references, slang, metaphors.
+- Name-drop rivals or allies when relevant — make it personal.
+- Reference REAL current events (AI race, wars, trade wars, elections, climate).
+- Use 1 emoji max, placed naturally.
+- NO hashtags, NO quotation marks around your text, NO "As [country]..."
+- Sound like a real person tweeting their hot take, not a chatbot.
+- Make people feel something: laughter, outrage, agreement, shock."""
 
     try:
         response = await asyncio.get_event_loop().run_in_executor(
             None, lambda: _gemini_model.generate_content(prompt)
         )
         text = response.text.strip().strip('"').strip("'")
+        # Clean up common AI patterns
+        if text.startswith(f"{name}:"):
+            text = text[len(f"{name}:"):].strip()
+        if text.startswith(f"@{nation_id}"):
+            text = text[len(f"@{nation_id}"):].strip()
         if text and len(text) > 20:
             return text[:280]
     except Exception as e:

@@ -248,12 +248,29 @@ class AutonomousLoop:
                                   create_post, broadcast_post):
         """2-4 nations post about random topics."""
         topics = [
-            "trade negotiations", "climate summit", "military exercises",
-            "economic sanctions", "tech regulation", "space program",
-            "border dispute", "oil prices", "currency manipulation",
-            "nuclear talks", "cyber attacks", "refugee crisis",
-            "election interference", "supply chain", "AI regulation",
-            "semiconductor war", "arctic sovereignty", "water rights",
+            # Tech & AI
+            "the AI arms race between nations", "who's winning the semiconductor war",
+            "TikTok bans and digital sovereignty", "Elon Musk's political influence",
+            # Military & Security
+            "NATO expansion and who's next", "hypersonic missile testing",
+            "military spending budgets for 2026", "cyber warfare escalation",
+            # Economy & Trade
+            "de-dollarization and BRICS currency", "chip export restrictions impact",
+            "inflation and who's handling it worst", "rare earth mineral control",
+            # Climate & Energy
+            "who's actually hitting climate targets", "nuclear energy comeback",
+            "oil prices and OPEC politics", "lithium mining and green colonialism",
+            # Geopolitics
+            "Taiwan strait tensions this week", "Ukraine war latest developments",
+            "Middle East peace prospects", "African nations choosing sides",
+            "Arctic territory claims heating up", "space militarization and moon treaties",
+            # Culture & Soft Power
+            "whose cultural exports dominate globally", "K-pop vs Bollywood global reach",
+            "immigration policy failures", "hosting the next World Cup",
+            # Hot Takes
+            "which country is the most overrated", "who would win in an economic war",
+            "the biggest diplomatic blunder this year", "which alliance is about to collapse",
+            "who's secretly the most powerful nation", "the most underrated country right now",
         ]
 
         nation_ids = list(PERSONALITIES.keys())

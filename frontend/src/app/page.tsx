@@ -437,24 +437,14 @@ export default function Home() {
     });
   };
 
-  // Search
-  const handleSearch = async (e: React.KeyboardEvent) => {
+  // Search — client-side filter by nation name or post content
+  const handleSearch = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (!searchQuery.trim()) {
         setSearching(false);
-        loadFeed();
         return;
       }
       setSearching(true);
-      setLoading(true);
-      try {
-        const res = await api.search(searchQuery);
-        const map = new Map<string, Post>();
-        res.results.forEach((p) => map.set(p.id, p));
-        setPosts(map);
-      } catch { } finally {
-        setLoading(false);
-      }
     }
   };
 
@@ -483,7 +473,18 @@ export default function Home() {
   const allPosts = Array.from(posts.values()).sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
-  const rootPosts = allPosts.filter((p) => !p.reply_to);
+  // Apply search filter
+  const q = searchQuery.trim().toLowerCase();
+  const filteredPosts = searching && q
+    ? allPosts.filter((p) =>
+      p.content?.toLowerCase().includes(q) ||
+      p.nation_name?.toLowerCase().includes(q) ||
+      p.nation_id?.toLowerCase().includes(q) ||
+      p.generation_meta?.topic?.toLowerCase().includes(q) ||
+      p.generation_meta?.action_type?.toLowerCase().includes(q)
+    )
+    : allPosts;
+  const rootPosts = filteredPosts.filter((p) => !p.reply_to);
 
   return (
     <div className="h-[calc(100vh-3.5rem)] flex flex-col overflow-hidden">
@@ -587,16 +588,13 @@ export default function Home() {
                 {nations.map((n) => (
                   <button
                     key={n.id}
-                    onClick={() => handleNationClick(n.id)}
+                    onClick={() => window.location.href = `/nation/${n.id.toLowerCase()}`}
                     className="w-full flex items-center gap-2.5 px-4 py-1.5 hover:bg-white/[0.03] transition text-left group"
                   >
                     <span className="text-base">{n.flag}</span>
                     <span className="text-[13px] text-white/50 group-hover:text-white/80 transition flex-1 truncate">
                       {n.name}
                     </span>
-                    {composingNation === n.id && (
-                      <span className="text-[10px] text-cyan-400/60 animate-breathe">typing…</span>
-                    )}
                     {user?.followed_nations?.includes(n.id) && (
                       <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60" />
                     )}
@@ -605,34 +603,36 @@ export default function Home() {
               </div>
             ))}
 
-            {/* Controls */}
-            <div className="border-t border-white/[0.05] mt-3 pt-3 px-4 space-y-2.5">
-              <div className="text-[10px] font-semibold text-white/20 uppercase tracking-wider mb-2">
-                Simulation
+            {/* Controls — admin only */}
+            {isAuthenticated && (
+              <div className="border-t border-white/[0.05] mt-3 pt-3 px-4 space-y-2.5">
+                <div className="text-[10px] font-semibold text-white/20 uppercase tracking-wider mb-2">
+                  Simulation
+                </div>
+                <button
+                  onClick={handleCrisis}
+                  className="w-full py-2 rounded-lg text-xs font-medium text-red-400/70 bg-red-500/[0.05] hover:bg-red-500/[0.1] border border-red-500/[0.08] transition active:scale-[0.97]"
+                >
+                  Trigger crisis event
+                </button>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={2} max={5}
+                    value={threadDepth}
+                    onChange={(e) => setThreadDepth(Number(e.target.value))}
+                    className="flex-1 h-1 bg-white/[0.06] rounded-full appearance-none cursor-pointer accent-cyan-500"
+                  />
+                  <span className="text-[10px] font-mono text-white/25 w-3">{threadDepth}</span>
+                </div>
+                <button
+                  onClick={handleThread}
+                  className="w-full py-2 rounded-lg text-xs font-medium text-cyan-400/70 bg-cyan-500/[0.05] hover:bg-cyan-500/[0.1] border border-cyan-500/[0.08] transition active:scale-[0.97]"
+                >
+                  Generate thread
+                </button>
               </div>
-              <button
-                onClick={handleCrisis}
-                className="w-full py-2 rounded-lg text-xs font-medium text-red-400/70 bg-red-500/[0.05] hover:bg-red-500/[0.1] border border-red-500/[0.08] transition active:scale-[0.97]"
-              >
-                Trigger crisis event
-              </button>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min={2} max={5}
-                  value={threadDepth}
-                  onChange={(e) => setThreadDepth(Number(e.target.value))}
-                  className="flex-1 h-1 bg-white/[0.06] rounded-full appearance-none cursor-pointer accent-cyan-500"
-                />
-                <span className="text-[10px] font-mono text-white/25 w-3">{threadDepth}</span>
-              </div>
-              <button
-                onClick={handleThread}
-                className="w-full py-2 rounded-lg text-xs font-medium text-cyan-400/70 bg-cyan-500/[0.05] hover:bg-cyan-500/[0.1] border border-cyan-500/[0.08] transition active:scale-[0.97]"
-              >
-                Generate thread
-              </button>
-            </div>
+            )}
           </div>
         </div>
 
@@ -765,10 +765,10 @@ export default function Home() {
                 {activityFeed.slice(0, 5).map((entry, i) => (
                   <div key={`${entry.timestamp}-${i}`} className="text-[11px] text-white/30 py-1 leading-snug border-b border-white/[0.02] last:border-0">
                     <span className={`font-mono text-[9px] font-bold mr-1 ${entry.event_type === 'diplomacy' ? 'text-purple-400/60' :
-                        entry.event_type === 'post' ? 'text-cyan-400/60' :
-                          entry.event_type === 'reply' ? 'text-emerald-400/60' :
-                            entry.event_type === 'news_reaction' ? 'text-red-400/60' :
-                              'text-white/20'
+                      entry.event_type === 'post' ? 'text-cyan-400/60' :
+                        entry.event_type === 'reply' ? 'text-emerald-400/60' :
+                          entry.event_type === 'news_reaction' ? 'text-red-400/60' :
+                            'text-white/20'
                       }`}>
                       {entry.event_type === 'diplomacy' ? 'DIP' :
                         entry.event_type === 'post' ? 'POST' :
