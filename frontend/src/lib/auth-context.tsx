@@ -10,6 +10,7 @@ interface AuthContextType {
     guestInteractionCount: number;
     login: (email: string, pass: string) => Promise<void>;
     signup: (email: string, user: string, pass: string) => Promise<void>;
+    googleLogin: (token: string) => Promise<void>;
     logout: () => void;
     recordGuestInteraction: () => void; // Call this when guest likes/replies
 }
@@ -54,6 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveTokens(data);
     };
 
+    const googleLogin = async (token: string) => {
+        const data = await api.googleAuth(token);
+        saveTokens(data);
+    };
+
     const logout = () => {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
@@ -75,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             guestInteractionCount,
             login,
             signup,
+            googleLogin,
             logout,
             recordGuestInteraction
         }}>

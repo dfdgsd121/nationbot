@@ -25,8 +25,8 @@ function LoopStatusPill() {
     const isActive = loopState.running && !loopState.paused;
     return (
         <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${isActive
-                ? "bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400/80"
-                : "bg-amber-500/[0.08] border-amber-500/20 text-amber-400/80"
+            ? "bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400/80"
+            : "bg-amber-500/[0.08] border-amber-500/20 text-amber-400/80"
             }`}>
             <div className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
             <span className="font-mono text-[9px] font-bold tracking-wider">
@@ -84,6 +84,9 @@ export function Navbar() {
                 )}
                 <Link href="/dashboard" className="font-mono text-[11px] text-white/25 hover:text-white/60 transition">
                     Dashboard
+                </Link>
+                <Link href="/world" className="font-mono text-[11px] text-white/25 hover:text-white/60 transition">
+                    World Map
                 </Link>
             </div>
 

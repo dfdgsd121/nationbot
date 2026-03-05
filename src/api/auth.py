@@ -53,6 +53,9 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class GoogleAuthRequest(BaseModel):
+    token: str
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
@@ -147,6 +150,8 @@ def create_user(email: str, username: str, password: str, role: str = "human") -
         "username": username,
         "hashed_password": hash_password(password),
         "role": role,
+        "auth_provider": "email",
+        "picture": None,
         "followed_nations": [],
         "api_key": None,
         "created_at": datetime.utcnow().isoformat(),
@@ -155,6 +160,43 @@ def create_user(email: str, username: str, password: str, role: str = "human") -
     USERS_DB[user_id] = user
     EMAILS_INDEX[email.lower()] = user_id
     logger.info(f"User created: {username} ({email})")
+    return user
+
+
+def create_or_get_google_user(email: str, name: str, picture: str = None) -> dict:
+    """Find existing user by email or create a new Google-auth user."""
+    existing = get_user_by_email(email)
+    if existing:
+        # Update picture if changed
+        if picture and existing.get("picture") != picture:
+            existing["picture"] = picture
+        return existing
+
+    user_id = str(uuid.uuid4())
+    username = name.replace(" ", "").lower()[:20] or email.split("@")[0]
+    # Ensure unique username
+    base = username
+    counter = 1
+    while any(u["username"] == username for u in USERS_DB.values()):
+        username = f"{base}{counter}"
+        counter += 1
+
+    user = {
+        "id": user_id,
+        "email": email.lower(),
+        "username": username,
+        "hashed_password": None,  # No password for Google users
+        "role": "human",
+        "auth_provider": "google",
+        "picture": picture,
+        "followed_nations": [],
+        "api_key": None,
+        "created_at": datetime.utcnow().isoformat(),
+        "interaction_count": 0,
+    }
+    USERS_DB[user_id] = user
+    EMAILS_INDEX[email.lower()] = user_id
+    logger.info(f"Google user created: {username} ({email})")
     return user
 
 def get_user_by_email(email: str) -> Optional[dict]:

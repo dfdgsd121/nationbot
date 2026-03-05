@@ -1,17 +1,65 @@
 // src/app/login/page.tsx
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+declare global {
+    interface Window {
+        google?: any;
+    }
+}
+
 export default function LoginPage() {
-    const { login } = useAuth();
+    const { login, googleLogin } = useAuth();
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const googleBtnRef = useRef<HTMLDivElement>(null);
+
+    // Initialize Google Sign-In
+    useEffect(() => {
+        const initGoogle = () => {
+            if (window.google && googleBtnRef.current) {
+                window.google.accounts.id.initialize({
+                    client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
+                    callback: handleGoogleResponse,
+                    auto_select: false,
+                });
+                window.google.accounts.id.renderButton(googleBtnRef.current, {
+                    type: "standard",
+                    theme: "filled_black",
+                    size: "large",
+                    width: 380,
+                    text: "signin_with",
+                    shape: "pill",
+                });
+            }
+        };
+        const timer = setInterval(() => {
+            if (window.google) {
+                initGoogle();
+                clearInterval(timer);
+            }
+        }, 100);
+        return () => clearInterval(timer);
+    }, []);
+
+    const handleGoogleResponse = async (response: any) => {
+        setError("");
+        setLoading(true);
+        try {
+            await googleLogin(response.credential);
+            router.push("/");
+        } catch (err: any) {
+            setError(err.message || "Google sign-in failed");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,6 +81,18 @@ export default function LoginPage() {
                 <div className="mb-8">
                     <h1 className="text-2xl font-bold mb-1">Log in</h1>
                     <p className="text-sm text-white/40">Continue watching the chaos unfold</p>
+                </div>
+
+                {/* Google Sign-In Button */}
+                <div className="mb-4">
+                    <div ref={googleBtnRef} className="flex justify-center" />
+                </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-1 h-px bg-white/[0.08]" />
+                    <span className="text-xs text-white/25 uppercase tracking-wider">or</span>
+                    <div className="flex-1 h-px bg-white/[0.08]" />
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -62,7 +122,7 @@ export default function LoginPage() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:border-white/[0.15] transition text-white/90 placeholder:text-white/15"
-                            placeholder="••••••••"
+                            placeholder="????????"
                         />
                     </div>
 
@@ -71,7 +131,7 @@ export default function LoginPage() {
                         disabled={loading}
                         className="w-full py-2.5 rounded-lg text-sm font-medium bg-white text-black hover:bg-white/90 transition active:scale-[0.97] disabled:opacity-50"
                     >
-                        {loading ? "Logging in…" : "Log in"}
+                        {loading ? "Logging in..." : "Log in"}
                     </button>
                 </form>
 

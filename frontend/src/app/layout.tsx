@@ -19,6 +19,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+      </head>
       <body
         className={`${inter.variable} ${mono.variable} font-sans bg-[#06080d] text-white overflow-hidden`}
       >

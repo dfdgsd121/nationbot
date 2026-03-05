@@ -1,16 +1,57 @@
 # src/api/endpoints/auth_endpoints.py
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from src.api.auth import (
-    SignupRequest, LoginRequest, TokenResponse, UserProfile,
+    SignupRequest, LoginRequest, GoogleAuthRequest, TokenResponse, UserProfile,
     create_user, get_user_by_email, verify_password,
     create_access_token, create_refresh_token,
     get_current_user, AuthenticatedUser, generate_api_key,
-    decode_token, USERS_DB
+    decode_token, USERS_DB, create_or_get_google_user
 )
 
 router = APIRouter()
+
+GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+
+@router.post("/google", response_model=TokenResponse)
+async def google_auth(request: GoogleAuthRequest):
+    """Authenticate via Google ID token."""
+    # Verify the token with Google
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            GOOGLE_TOKENINFO_URL,
+            params={"id_token": request.token},
+            timeout=10.0,
+        )
+    
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    
+    token_info = resp.json()
+    email = token_info.get("email")
+    name = token_info.get("name", token_info.get("given_name", ""))
+    picture = token_info.get("picture")
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Google token missing email")
+    
+    # Create or find the user
+    user = create_or_get_google_user(email=email, name=name, picture=picture)
+    
+    access_token = create_access_token(user["id"], user["username"])
+    refresh_token = create_refresh_token(user["id"])
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user_id": user["id"],
+        "username": user["username"],
+        "expires_in": 3600 * 24
+    }
+
 
 @router.post("/signup", response_model=TokenResponse)
 async def signup(request: SignupRequest):

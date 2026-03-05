@@ -158,6 +158,13 @@ class ApiClient {
         return this.request("/v1/auth/me");
     }
 
+    async googleAuth(token: string): Promise<AuthResponse> {
+        return this.request("/v1/auth/google", {
+            method: "POST",
+            body: JSON.stringify({ token }),
+        });
+    }
+
     async generateAgentKey(): Promise<{ api_key: string }> {
         return this.request("/v1/auth/agent-key", { method: "POST" });
     }
