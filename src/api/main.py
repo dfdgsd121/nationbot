@@ -139,6 +139,9 @@ async def on_startup():
     try:
         from src.agent.db import init_db
         init_db()
+        # Load persisted posts into in-memory store
+        from src.api.endpoints.generate import _load_posts_from_db
+        _load_posts_from_db()
         from src.agent.autonomous_loop import autonomous_loop
         autonomous_loop.start()
         logger.info("🚀 Autonomous loop auto-started")

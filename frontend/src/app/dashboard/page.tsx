@@ -2,6 +2,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { api, timeAgo } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 interface LoopStatus {
     running: boolean;
@@ -49,6 +50,7 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+    const { isAuthenticated } = useAuth();
     const [status, setStatus] = useState<LoopStatus | null>(null);
     const [activity, setActivity] = useState<ActivityEntry[]>([]);
     const [error, setError] = useState("");
@@ -159,7 +161,8 @@ export default function DashboardPage() {
                     </div>
                 )}
 
-                {/* Control panel */}
+                {/* Control panel — admin only */}
+                {isAuthenticated ? (
                 <div className="border border-white/[0.06] rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-4">
                         <h2 className="text-sm font-medium text-white/60">Controls</h2>
@@ -219,6 +222,12 @@ export default function DashboardPage() {
                         </button>
                     </div>
                 </div>
+                ) : (
+                <div className="border border-white/[0.06] rounded-lg p-4 text-center">
+                    <p className="text-sm text-white/40 mb-2">Log in to access admin controls</p>
+                    <a href="/login" className="text-xs text-cyan-400 hover:text-cyan-300 transition">Log in →</a>
+                </div>
+                )}
 
                 {/* Stats grid */}
                 {status?.stats && (

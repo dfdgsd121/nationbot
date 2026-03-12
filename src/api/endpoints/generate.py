@@ -895,10 +895,24 @@ except ImportError:
     pass
 
 # ============================================================================
-# IN-MEMORY STORE
+# IN-MEMORY STORE (kept for SSE speed, DB is source of truth)
 # ============================================================================
 POSTS_STORE: list[dict] = []
 MAX_STORE_SIZE = 1000
+
+from src.agent.db import (
+    create_post_db, get_posts_db, get_post_by_id_db, update_post_db,
+    has_user_liked_db, add_user_like_db, has_user_boosted_db, add_user_boost_db,
+    get_post_count_db, update_user_db, get_user_by_id_db,
+)
+
+def _load_posts_from_db():
+    """Load posts from DB into in-memory store on startup."""
+    global POSTS_STORE
+    db_posts = get_posts_db(limit=MAX_STORE_SIZE)
+    if db_posts:
+        POSTS_STORE = db_posts
+        logger.info(f"Loaded {len(POSTS_STORE)} posts from SQLite")
 
 
 # ============================================================================
@@ -955,7 +969,7 @@ def create_post(nation_id: str, content: str, reply_to: str = None,
     nation = PERSONALITIES[nation_id]
     _ensure_rep(nation_id)
     post = {
-        "id": f"post_{len(POSTS_STORE)+1}_{int(datetime.utcnow().timestamp()*1000)}",
+        "id": f"post_{get_post_count_db()+len(POSTS_STORE)+1}_{int(datetime.utcnow().timestamp()*1000)}",
         "nation_id": nation_id,
         "nation_name": nation["name"],
         "flag": nation["flag"],
@@ -979,9 +993,14 @@ def create_post(nation_id: str, content: str, reply_to: str = None,
         REPUTATION[nation_id]["threads_participated"] += 1
     if news_reaction:
         rep_gain(nation_id, 4)  # News awareness bonus
+    # Dual-write: in-memory (SSE speed) + SQLite (persistence)
     POSTS_STORE.insert(0, post)
     if len(POSTS_STORE) > MAX_STORE_SIZE:
         POSTS_STORE.pop()
+    try:
+        create_post_db(post)
+    except Exception as e:
+        logger.warning(f"Failed to persist post to DB: {e}")
     return post
 
 
@@ -1164,7 +1183,11 @@ async def trigger_thread(request: TriggerThreadRequest, background_tasks: Backgr
 
 @router.get("/feed")
 async def get_feed(limit: int = 50):
-    return {"posts": POSTS_STORE[:limit], "total": len(POSTS_STORE)}
+    # Read from in-memory for speed; falls back to DB if empty
+    if POSTS_STORE:
+        return {"posts": POSTS_STORE[:limit], "total": len(POSTS_STORE)}
+    db_posts = get_posts_db(limit=limit)
+    return {"posts": db_posts, "total": len(db_posts)}
 
 
 @router.get("/nations")
@@ -1182,13 +1205,16 @@ async def list_nations():
 @router.post("/like/{post_id}")
 async def like_post(post_id: str, user: AuthenticatedUser | GuestUser = Depends(get_optional_user)):
     user_id = user.id if user.is_authenticated else "guest"
+    # Per-user like tracking
+    if user.is_authenticated and has_user_liked_db(user_id, post_id):
+        return {"status": "already_liked", "message": "You already liked this post"}
     for post in POSTS_STORE:
         if post["id"] == post_id:
             post["likes"] += 1
             if user.is_authenticated:
-                # Could store liked_by set here
-                pass
-            rep_gain(post["nation_id"], 1)  # Rep for being liked
+                add_user_like_db(user_id, post_id)
+            rep_gain(post["nation_id"], 1)
+            update_post_db(post_id, likes=post["likes"])
             return {"status": "success", "likes": post["likes"], "user_id": user_id}
     return {"status": "not_found"}
 
@@ -1202,15 +1228,18 @@ async def boost_post(post_id: str, user: AuthenticatedUser | GuestUser = Depends
     """Amplify a post — increases visibility and author reputation"""
     user_id = user.id if user.is_authenticated else "guest"
     record_metric("total_boosts")
+    # Per-user boost tracking
+    if user.is_authenticated and has_user_boosted_db(user_id, post_id):
+        return {"status": "already_boosted", "message": "You already boosted this post"}
     for post in POSTS_STORE:
         if post["id"] == post_id:
             post["boosts"] = post.get("boosts", 0) + 1
             if user.is_authenticated:
-                # Could log boost
-                pass
-            rep_gain(post["nation_id"], 8)  # Big rep for being boosted
+                add_user_boost_db(user_id, post_id)
+            rep_gain(post["nation_id"], 8)
             _ensure_rep(post["nation_id"])
             REPUTATION[post["nation_id"]]["boosts_received"] += 1
+            update_post_db(post_id, boosts=post["boosts"])
             return {
                 "status": "success", "boosts": post["boosts"],
                 "nation_rep": REPUTATION[post["nation_id"]]["score"],
@@ -1250,6 +1279,7 @@ async def fork_post(post_id: str, background_tasks: BackgroundTasks, user: Authe
     parent["forks"] = parent.get("forks", 0) + 1
     _ensure_rep(parent["nation_id"])
     REPUTATION[parent["nation_id"]]["forks_received"] += 1
+    update_post_db(parent["id"], forks=parent["forks"])
     background_tasks.add_task(broadcast_post, fork)
 
     return {"status": "success", "fork": fork, "parent_id": parent["id"]}
@@ -1350,36 +1380,32 @@ async def search_posts(
 
 @router.post("/follow/{nation_id}")
 async def follow_nation(nation_id: str, user: AuthenticatedUser = Depends(get_current_user)):
-    """Follow a nation to get filtered feed"""
+    """Follow a nation to get filtered feed — persists to SQLite"""
     nid = nation_id.upper()
     if nid not in VALID_NATION_IDS:
         raise HTTPException(status_code=422, detail=f"Unknown nation: {nid}")
-    
-    # In-memory store logic
+
+    # In-memory
     if user.id not in FOLLOWS:
         FOLLOWS[user.id] = set()
     FOLLOWS[user.id].add(nid)
-    
-    # Update user object in DB (mock)
-    from src.api.auth import USERS_DB
-    if user.id in USERS_DB:
-        USERS_DB[user.id]["followed_nations"] = list(FOLLOWS[user.id])
-        
+
+    # Persist to SQLite
+    update_user_db(user.id, followed_nations=sorted(list(FOLLOWS[user.id])))
+
     return {"status": "success", "following": sorted(list(FOLLOWS[user.id])), "count": len(FOLLOWS[user.id])}
 
 
 @router.delete("/follow/{nation_id}")
 async def unfollow_nation(nation_id: str, user: AuthenticatedUser = Depends(get_current_user)):
-    """Unfollow a nation"""
+    """Unfollow a nation — persists to SQLite"""
     nid = nation_id.upper()
     if user.id in FOLLOWS:
         FOLLOWS[user.id].discard(nid)
-        
-    # Update user object in DB (mock)
-    from src.api.auth import USERS_DB
-    if user.id in USERS_DB:
-        USERS_DB[user.id]["followed_nations"] = list(FOLLOWS.get(user.id, []))
-        
+
+    # Persist to SQLite
+    update_user_db(user.id, followed_nations=sorted(list(FOLLOWS.get(user.id, []))))
+
     return {"status": "success", "following": sorted(list(FOLLOWS.get(user.id, []))), "count": len(FOLLOWS.get(user.id, []))}
 
 
@@ -1475,6 +1501,7 @@ async def debug_info():
             "p95_latency_ms": sorted_l[int(len(sorted_l)*0.95)] if len(sorted_l) > 1 else sorted_l[0],
         },
         "store_size": len(POSTS_STORE),
+        "db_post_count": get_post_count_db(),
         "reputation_initialized": len(REPUTATION),
         "follows_sessions": len(FOLLOWS),
     }

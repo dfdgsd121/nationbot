@@ -1,7 +1,7 @@
 # src/api/auth.py
 """
 NationBot Auth System — JWT + Password Hashing
-Zero-vendor, built-in auth with lazy auth for guests.
+SQLite-backed persistent auth with lazy auth for guests.
 """
 import os
 import uuid
@@ -14,7 +14,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
+
+from src.agent.db import (
+    create_user_db, get_user_by_email_db, get_user_by_id_db,
+    get_user_by_api_key_db, update_user_db,
+)
 
 logger = logging.getLogger("nationbot.auth")
 
@@ -28,13 +33,6 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
-
-# ============================================================================
-# IN-MEMORY USER STORE (swap for PostgreSQL in production)
-# ============================================================================
-USERS_DB: dict[str, dict] = {}   # user_id -> user dict
-EMAILS_INDEX: dict[str, str] = {}  # email -> user_id
-API_KEYS_INDEX: dict[str, str] = {}  # api_key -> user_id
 
 
 # ============================================================================
@@ -137,83 +135,49 @@ def decode_token(token: str) -> dict:
 
 
 # ============================================================================
-# USER CRUD
+# USER CRUD — Now backed by SQLite
 # ============================================================================
 def create_user(email: str, username: str, password: str, role: str = "human") -> dict:
-    if email.lower() in EMAILS_INDEX:
+    existing = get_user_by_email_db(email)
+    if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
     user_id = str(uuid.uuid4())
-    user = {
-        "id": user_id,
-        "email": email.lower(),
-        "username": username,
-        "hashed_password": hash_password(password),
-        "role": role,
-        "auth_provider": "email",
-        "picture": None,
-        "followed_nations": [],
-        "api_key": None,
-        "created_at": datetime.utcnow().isoformat(),
-        "interaction_count": 0,
-    }
-    USERS_DB[user_id] = user
-    EMAILS_INDEX[email.lower()] = user_id
-    logger.info(f"User created: {username} ({email})")
+    hashed = hash_password(password)
+    user = create_user_db(user_id, email, username, hashed, role, "email")
+    logger.info(f"User created (SQLite): {username} ({email})")
     return user
 
 
 def create_or_get_google_user(email: str, name: str, picture: str = None) -> dict:
     """Find existing user by email or create a new Google-auth user."""
-    existing = get_user_by_email(email)
+    existing = get_user_by_email_db(email)
     if existing:
         # Update picture if changed
         if picture and existing.get("picture") != picture:
+            update_user_db(existing["id"], picture=picture)
             existing["picture"] = picture
         return existing
 
     user_id = str(uuid.uuid4())
     username = name.replace(" ", "").lower()[:20] or email.split("@")[0]
-    # Ensure unique username
-    base = username
-    counter = 1
-    while any(u["username"] == username for u in USERS_DB.values()):
-        username = f"{base}{counter}"
-        counter += 1
 
-    user = {
-        "id": user_id,
-        "email": email.lower(),
-        "username": username,
-        "hashed_password": None,  # No password for Google users
-        "role": "human",
-        "auth_provider": "google",
-        "picture": picture,
-        "followed_nations": [],
-        "api_key": None,
-        "created_at": datetime.utcnow().isoformat(),
-        "interaction_count": 0,
-    }
-    USERS_DB[user_id] = user
-    EMAILS_INDEX[email.lower()] = user_id
-    logger.info(f"Google user created: {username} ({email})")
+    user = create_user_db(user_id, email, username, None, "human", "google", picture)
+    logger.info(f"Google user created (SQLite): {username} ({email})")
     return user
 
 def get_user_by_email(email: str) -> Optional[dict]:
-    uid = EMAILS_INDEX.get(email.lower())
-    return USERS_DB.get(uid) if uid else None
+    return get_user_by_email_db(email)
 
 def get_user_by_id(user_id: str) -> Optional[dict]:
-    return USERS_DB.get(user_id)
+    return get_user_by_id_db(user_id)
 
 def generate_api_key(user_id: str) -> str:
-    user = USERS_DB.get(user_id)
+    user = get_user_by_id_db(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     key = f"nb_{secrets.token_hex(24)}"
-    user["api_key"] = key
-    user["role"] = "agent"
-    API_KEYS_INDEX[key] = user_id
+    update_user_db(user_id, api_key=key, role="agent")
     return key
 
 
@@ -231,17 +195,14 @@ async def get_current_user(
 
     # Check API key first
     if token.startswith("nb_"):
-        uid = API_KEYS_INDEX.get(token)
-        if not uid:
-            raise HTTPException(status_code=401, detail="Invalid API key")
-        user = USERS_DB.get(uid)
+        user = get_user_by_api_key_db(token)
         if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+            raise HTTPException(status_code=401, detail="Invalid API key")
         return AuthenticatedUser(user)
 
     # JWT token
     payload = decode_token(token)
-    user = USERS_DB.get(payload.get("sub"))
+    user = get_user_by_id_db(payload.get("sub"))
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return AuthenticatedUser(user)
@@ -259,14 +220,14 @@ async def get_optional_user(
 
         # API key
         if token.startswith("nb_"):
-            uid = API_KEYS_INDEX.get(token)
-            if uid and uid in USERS_DB:
-                return AuthenticatedUser(USERS_DB[uid])
+            user = get_user_by_api_key_db(token)
+            if user:
+                return AuthenticatedUser(user)
             return GuestUser()
 
         # JWT
         payload = decode_token(token)
-        user = USERS_DB.get(payload.get("sub"))
+        user = get_user_by_id_db(payload.get("sub"))
         if user:
             return AuthenticatedUser(user)
     except Exception:
