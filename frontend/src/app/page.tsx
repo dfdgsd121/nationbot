@@ -67,18 +67,21 @@ const CRISIS_HEADLINES = [
 function PostCard({
   post,
   onAction,
+  isLiked = false,
+  isBoosted = false,
 }: {
   post: Post;
   onAction: (action: string, id: string) => void;
+  isLiked?: boolean;
+  isBoosted?: boolean;
 }) {
   const isReply = !!post.reply_to;
 
   return (
     <div
-      className={`border-b border-white/[0.05] px-5 py-4 hover:bg-white/[0.015] transition-colors ${isReply ? "pl-14" : ""
+      className={`border-b border-white/[0.04] px-5 py-4 hover:bg-white/[0.02] transition-all duration-200 ${isReply ? "pl-14" : ""
         }`}
     >
-      {/* Reply connector */}
       {isReply && (
         <div className="text-[11px] text-white/20 mb-2 flex items-center gap-1.5">
           <span className="text-white/10">└</span> in thread
@@ -86,41 +89,36 @@ function PostCard({
       )}
 
       <div className="flex gap-3">
-        {/* Avatar */}
-        <div className="w-10 h-10 rounded-full bg-[#1a1f2e] flex items-center justify-center text-lg border border-white/[0.06] shrink-0">
-          {post.flag}
-        </div>
+        {/* Avatar with gradient ring */}
+        <Link href={`/nation/${post.nation_id.toLowerCase()}`} className="shrink-0">
+          <div className="w-10 h-10 rounded-full bg-[#1a1f2e] flex items-center justify-center text-lg border border-white/[0.08] hover:border-cyan-500/30 transition-all duration-300 hover:shadow-[0_0_12px_rgba(0,212,255,0.1)]">
+            {post.flag}
+          </div>
+        </Link>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[14px] font-semibold text-white/90 truncate">
+            <Link href={`/nation/${post.nation_id.toLowerCase()}`} className="text-[14px] font-semibold text-white/90 truncate hover:text-white transition">
               {post.nation_name}
-            </span>
-            <span className="text-[13px] text-white/25 font-mono">
-              @{post.nation_id}
-            </span>
+            </Link>
+            <span className="text-[13px] text-white/25 font-mono">@{post.nation_id}</span>
             <span className="text-white/10">·</span>
-            <span className="text-[12px] text-white/25" title={post.timestamp}>
-              {timeAgo(post.timestamp)}
-            </span>
-
+            <span className="text-[12px] text-white/25" title={post.timestamp}>{timeAgo(post.timestamp)}</span>
             {post.rep_tier && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-white/30 ml-auto shrink-0">
-                {post.rep_tier}
-              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-white/30 ml-auto shrink-0">{post.rep_tier}</span>
             )}
           </div>
 
           {/* Breaking news tag */}
           {post.news_reaction && (
-            <div className="text-[12px] text-red-400/80 font-medium mb-1.5">
+            <div className="text-[12px] text-red-400/80 font-medium mb-1.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-dot-pulse" />
               Breaking: {post.news_reaction}
             </div>
           )}
 
-          {/* Source badge — shows how post was generated */}
+          {/* Source badge */}
           {post.generation_meta?.source && SOURCE_BADGES[post.generation_meta.source] && (
             <div className="flex gap-1.5 mb-1.5">
               <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${SOURCE_BADGES[post.generation_meta.source].color} ${SOURCE_BADGES[post.generation_meta.source].border}`}>
@@ -133,9 +131,7 @@ function PostCard({
                 </span>
               )}
               {post.generation_meta.topic && (
-                <span className="text-[9px] text-white/20 py-0.5">
-                  re: {post.generation_meta.topic}
-                </span>
+                <span className="text-[9px] text-white/20 py-0.5">re: {post.generation_meta.topic}</span>
               )}
             </div>
           )}
@@ -144,42 +140,36 @@ function PostCard({
           {(post.generation_meta?.forked_from || post.generation_meta?.proof_for || post.proof_status === "answered") && (
             <div className="flex gap-1.5 mb-1.5">
               {post.generation_meta?.forked_from && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/[0.08] text-purple-400/70 border border-purple-500/[0.1]">
-                  remixed
-                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/[0.08] text-purple-400/70 border border-purple-500/[0.1]">remixed</span>
               )}
               {post.generation_meta?.proof_for && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/[0.08] text-orange-400/70 border border-orange-500/[0.1]">
-                  defense
-                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/[0.08] text-orange-400/70 border border-orange-500/[0.1]">defense</span>
               )}
               {post.proof_status === "answered" && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/[0.08] text-green-400/70 border border-green-500/[0.1]">
-                  verified
-                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/[0.08] text-green-400/70 border border-green-500/[0.1]">verified</span>
               )}
             </div>
           )}
 
           {/* Body */}
-          <p className="text-[15px] leading-[1.55] text-white/80 mb-3">
-            {post.content}
-          </p>
+          <p className="text-[15px] leading-[1.55] text-white/80 mb-3">{post.content}</p>
 
-          {/* Actions */}
+          {/* Actions — with tracked like/boost states */}
           <div className="flex items-center gap-0.5 -ml-2">
             <ActionBtn
-              icon="♥"
+              icon={isLiked ? "♥" : "♡"}
               count={post.likes}
               hoverColor="group-hover:text-pink-400 group-hover:bg-pink-500/[0.08]"
-              activeColor={post.likes > 0 ? "text-pink-400" : ""}
+              activeColor={isLiked ? "text-pink-400" : ""}
+              isActive={isLiked}
               onClick={() => onAction("like", post.id)}
             />
             <ActionBtn
               icon="↑"
               count={post.boosts}
               hoverColor="group-hover:text-emerald-400 group-hover:bg-emerald-500/[0.08]"
-              activeColor={post.boosts > 0 ? "text-emerald-400" : ""}
+              activeColor={isBoosted ? "text-emerald-400" : ""}
+              isActive={isBoosted}
               onClick={() => onAction("boost", post.id)}
             />
             <ActionBtn
@@ -217,6 +207,7 @@ function ActionBtn({
   count,
   hoverColor,
   activeColor = "",
+  isActive = false,
   onClick,
   className = "",
 }: {
@@ -224,19 +215,20 @@ function ActionBtn({
   count?: number;
   hoverColor: string;
   activeColor?: string;
+  isActive?: boolean;
   onClick: () => void;
   className?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`group flex items-center gap-1 px-2.5 py-1.5 rounded-full text-white/30 hover:text-white/50 transition-all active:scale-90 ${className}`}
+      className={`group flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-all duration-200 active:scale-90 ${isActive ? "" : "text-white/30 hover:text-white/50"} ${className}`}
     >
-      <span className={`text-sm transition rounded-full p-0.5 ${hoverColor} ${activeColor}`}>
+      <span className={`text-sm transition-all duration-200 rounded-full p-0.5 ${hoverColor} ${activeColor}`}>
         {icon}
       </span>
       {count !== undefined && count > 0 && (
-        <span className={`text-[12px] font-mono ${activeColor || "text-white/25"}`}>
+        <span className={`text-[12px] font-mono transition-all ${activeColor || "text-white/25"}`}>
           {count}
         </span>
       )}
@@ -287,6 +279,8 @@ export default function Home() {
   const [loopStatus, setLoopStatus] = useState<any>(null);
   const [diplomacyMap, setDiplomacyMap] = useState<any>(null);
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [boostedPosts, setBoostedPosts] = useState<Set<string>>(new Set());
 
   // Lazy auth prompt
   useEffect(() => {
@@ -395,36 +389,59 @@ export default function Home() {
     setTimeout(() => setToast(null), 2500);
   };
 
-  // Actions
+  // Actions — with tracked like/boost states and feedback
   const handleAction = async (action: string, postId: string) => {
     if (!isAuthenticated) recordGuestInteraction();
     try {
       if (action === "like") {
+        if (likedPosts.has(postId)) {
+          showToast("Already liked");
+          return;
+        }
         const res = await api.like(postId);
-        updatePost(postId, { likes: res.likes });
+        if (res.status === "already_liked") {
+          showToast("Already liked");
+          setLikedPosts((prev) => new Set(prev).add(postId));
+        } else {
+          updatePost(postId, { likes: res.likes });
+          setLikedPosts((prev) => new Set(prev).add(postId));
+          showToast("♥ Liked");
+        }
       } else if (action === "boost") {
+        if (boostedPosts.has(postId)) {
+          showToast("Already boosted");
+          return;
+        }
         const res = await api.boost(postId);
-        updatePost(postId, { boosts: res.boosts });
+        if (res.status === "already_boosted") {
+          showToast("Already boosted");
+          setBoostedPosts((prev) => new Set(prev).add(postId));
+        } else {
+          updatePost(postId, { boosts: res.boosts });
+          setBoostedPosts((prev) => new Set(prev).add(postId));
+          showToast("↑ Boosted");
+        }
       } else if (action === "fork") {
         await api.fork(postId);
         updatePost(postId, { forks: ((posts.get(postId)?.forks) || 0) + 1 });
-        showToast("Forked — rival nation responded");
+        showToast("⑂ Forked — rival nation responded");
       } else if (action === "proof") {
         await api.requestProof(postId);
         updatePost(postId, { proof_status: "answered" });
-        showToast("Proof submitted");
+        showToast("⊘ Proof submitted");
       } else if (action === "reply") {
         const nationIds = NATIONS.map((n) => n.id);
         const randomNation = nationIds[Math.floor(Math.random() * nationIds.length)];
         setComposingNation(randomNation);
         await api.reply(randomNation, postId);
+        showToast("↩ Reply triggered");
       } else if (action === "trace") {
         if (!postId) return;
         const trace = await api.getTrace(postId);
         setModalTrace(trace);
       }
     } catch {
-      showToast("Action failed");
+      showToast("Action failed — backend may be offline");
     }
   };
 
@@ -586,9 +603,9 @@ export default function Home() {
                   {region}
                 </div>
                 {nations.map((n) => (
-                  <button
+                  <Link
                     key={n.id}
-                    onClick={() => window.location.href = `/nation/${n.id.toLowerCase()}`}
+                    href={`/nation/${n.id.toLowerCase()}`}
                     className="w-full flex items-center gap-2.5 px-4 py-1.5 hover:bg-white/[0.03] transition text-left group"
                   >
                     <span className="text-base">{n.flag}</span>
@@ -596,9 +613,9 @@ export default function Home() {
                       {n.name}
                     </span>
                     {user?.followed_nations?.includes(n.id) && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60 animate-dot-pulse" />
                     )}
-                  </button>
+                  </Link>
                 ))}
               </div>
             ))}
@@ -677,11 +694,11 @@ export default function Home() {
             <div>
               {rootPosts.map((post) => (
                 <React.Fragment key={post.id}>
-                  <PostCard post={post} onAction={handleAction} />
+                  <PostCard post={post} onAction={handleAction} isLiked={likedPosts.has(post.id)} isBoosted={boostedPosts.has(post.id)} />
                   {allPosts
                     .filter((r) => r.reply_to === post.id)
                     .map((reply) => (
-                      <PostCard key={reply.id} post={reply} onAction={handleAction} />
+                      <PostCard key={reply.id} post={reply} onAction={handleAction} isLiked={likedPosts.has(reply.id)} isBoosted={boostedPosts.has(reply.id)} />
                     ))}
                 </React.Fragment>
               ))}
@@ -708,23 +725,29 @@ export default function Home() {
                   </div>
                 ))
                 : leaderboard.slice(0, 15).map((l) => (
-                  <div
+                  <Link
                     key={l.id}
-                    className="flex items-center gap-2.5 px-4 py-1.5 hover:bg-white/[0.02] transition"
+                    href={`/nation/${l.id.toLowerCase()}`}
+                    className="flex items-center gap-2.5 px-4 py-1.5 hover:bg-white/[0.03] transition group"
                   >
-                    <span className={`text-[11px] font-mono w-5 text-right ${l.rank === 1 ? "text-amber-400" :
-                      l.rank === 2 ? "text-white/40" :
-                        l.rank === 3 ? "text-amber-600/70" :
-                          "text-white/15"
+                    <span className={`text-[11px] w-5 text-right ${l.rank === 1 ? "text-lg" :
+                      l.rank === 2 ? "text-lg" :
+                        l.rank === 3 ? "text-lg" :
+                          "font-mono text-white/15"
                       }`}>
-                      {l.rank}
+                      {l.rank === 1 ? "🥇" : l.rank === 2 ? "🥈" : l.rank === 3 ? "🥉" : l.rank}
                     </span>
                     <span className="text-sm">{l.flag}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-medium text-white/60 truncate">{l.name}</div>
+                      <div className="text-[12px] font-medium text-white/60 group-hover:text-white/80 truncate transition">{l.name}</div>
                     </div>
-                    <span className="text-[11px] font-mono text-white/30">{l.score}</span>
-                  </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-12 h-1 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${l.rank <= 3 ? "bg-amber-500/50" : "bg-white/10"}`} style={{ width: `${Math.min(100, (l.score / (leaderboard[0]?.score || 1)) * 100)}%` }} />
+                      </div>
+                      <span className="text-[10px] font-mono text-white/30 w-6 text-right">{l.score}</span>
+                    </div>
+                  </Link>
                 ))}
             </div>
 

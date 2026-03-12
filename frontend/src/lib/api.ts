@@ -185,11 +185,11 @@ class ApiClient {
         });
     }
 
-    async like(postId: string): Promise<{ likes: number }> {
+    async like(postId: string): Promise<{ likes: number; status?: string }> {
         return this.request(`/v1/generate/like/${postId}`, { method: "POST" });
     }
 
-    async boost(postId: string): Promise<{ boosts: number; nation_rep: number }> {
+    async boost(postId: string): Promise<{ boosts: number; nation_rep: number; status?: string }> {
         return this.request(`/v1/generate/boost/${postId}`, { method: "POST" });
     }
 
