@@ -20,6 +20,19 @@
   --glass-border: rgba(255, 255, 255, 0.08);
 }
 
+/* Subtle grid background overlay */
+.grid-bg {
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Glow on focus for interactive elements */
+.focus-glow:focus-within {
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1), 0 0 20px rgba(0, 212, 255, 0.06);
+}
+
 @theme inline {
   --color-background: var(--bg-primary);
   --color-foreground: var(--text-primary);
